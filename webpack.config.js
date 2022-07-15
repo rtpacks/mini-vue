@@ -16,8 +16,11 @@ module.exports = {
     extensions: ['.js'] /* 配置文件后缀 */
   },
   devServer: {
-    contentBase: './src/examples',
+    hot: true,  // 打开热更新开关
+    contentBase:path.resolve(__dirname,'src'),
     publicPath: '/dist',
     watchContentBase: true,
+    historyApiFallback: true,
+    compress: true
   },
 };
