@@ -1,4 +1,4 @@
-import { hasChanged, isObject } from "../utils";
+import { hasChanged, isArray, isObject } from "../utils";
 import { track, trigger } from "./effect";
 
 /**
@@ -36,6 +36,7 @@ export function reactive(target) {
   const proxy = new Proxy(target, {
     get(target, key, receiver) {
       const res = Reflect.get(target, key, receiver);
+      /* 特殊情况六：嵌套的effect，会导致外层的effect丢失！在effect函数中利用栈解决 */
       track(target, key);
       /* 特殊情况四：深层代理，在vue2中所有的对象都被代理了，但是vue3可以选择哪些被代理 */
       // return res;
@@ -43,8 +44,15 @@ export function reactive(target) {
     },
     set(target, key, value, receiver) {
       /* 特殊情况三：只有值变化了才更新，如果前后是相同的值，不进行更新 */
-      if (!hasChanged(target[key], value)) return;
+      if (!hasChanged(target[key], value))
+        return true; /* 注意set需要返回true代表更新成功，否则报错！ */
       const flag = Reflect.set(target, key, value, receiver);
+      
+      /* 特殊情况五：数组的问题，数组长度的问题 数组的key需要手动触发 */
+      if (isArray(target) && key === 'length' && hasChanged(target.length, value)) {
+        trigger(target, "length"); /* 数组的key需要手动触发 */
+      }
+      
       trigger(target, key); /* 必须等对象更新完成后再触发 */
       return flag;
     },
