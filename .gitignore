@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+
+*.log
+*.snap
+
+# 编辑器
+.vscode
+.idea

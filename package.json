@@ -1,0 +1,19 @@
+{
+  "name": "mini-vue",
+  "version": "1.0.0",
+  "description": "手动实现mini-vue",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mini-vue",
+    "vue",
+    "vue解析"
+  ],
+  "author": "azin-cn",
+  "license": "ISC",
+  "devDependencies": {
+    "webpack": "^5.73.0"
+  }
+}
