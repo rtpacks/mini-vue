@@ -12,7 +12,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "computed": () => (/* binding */ computed)
 /* harmony export */ });
-/* harmony import */ var _effect__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./effect */ "./src/reactivity/effect.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _effect__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./effect */ "./src/reactivity/effect.js");
 /* 无论是基本数据还是传入的函数，都是放入一个对象中存储，不同的是为了设计computed的缓存特性增加了lazy与scheduler调用
     lazy避免第一次运行，通过effect函数保存scheduler，最后在trigger中判断是否有调度器，
     如果有调度器调用调度器，否则才是调用传入的函数
@@ -24,37 +25,58 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+
 class ComputedImpl {
-  constructor(getter) {
-    this._value = undefined /* 当前的值 */
-    this._dirty = true /* 表示computed依赖的变量有更新，不是依赖computed的函数！ */
-    this.effect = (0,_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(getter, {
+  constructor(options) {
+    this._setter = options.setter;
+    this._value = undefined; /* 当前的值 */
+    this._dirty = true; /* 表示computed依赖的变量有更新，不是依赖computed的函数！ */
+    this.effect = (0,_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(options.getter, {
       lazy: true,
-      scheduler: () => { /* 调度器是为了满足缓存的特性而设计的！trigger只会调用调度器，通过调度器控制_ditry来更新，并且不会直接调用 */
-        this._dirty = true /* 当scheduler被调用时，表示的变量发生了更新，但是getter不会被调用，而是自身的value被引用即触发get操作时才会判断_dirty并决定是否重新计算 */
-        ;(0,_effect__WEBPACK_IMPORTED_MODULE_0__.trigger)(this, 'value') /* 通知依赖自身的函数更新，通过get捕获判断_dirty重新计算，注意和trigger函数中进行区分！ */
-      }
-    }) /* 修改effect函数，如果传入了lazy初始默认不执行，如果传入了scheduler，则保存在自身上！ */
+      scheduler: () => {
+        /* 调度器是为了满足缓存的特性而设计的！trigger只会调用调度器，通过调度器控制_ditry来更新，并且不会直接调用 */
+        if (!this._dirty) {
+          // 如果未更新不需要重新计算
+          this._dirty = true; /* 当scheduler被调用时，表示的变量发生了更新，但是getter不会被调用，而是自身的value被引用即触发get操作时才会判断_dirty并决定是否重新计算 */
+          (0,_effect__WEBPACK_IMPORTED_MODULE_1__.trigger)(
+            this,
+            "value"
+          ); /* 通知依赖自身的函数更新，通过get捕获判断_dirty重新计算，注意和trigger函数中进行区分！ */
+        }
+      },
+    }); /* 修改effect函数，如果传入了lazy初始默认不执行，如果传入了scheduler，则保存在自身上！ */
   }
 
   get value() {
-    if (this._dirty) { // 通过判断自身依赖的变量是否发生了更新，从而确定自身是否更新
-      this._dirty = false // 重新计算后，将_dirty置为false
-      this._value = this.effect() /* 此时调用的函数是从effect函数中返回的，是getter操作被封装成一个effectFn，最后返回的 */
-      ;(0,_effect__WEBPACK_IMPORTED_MODULE_0__.track)(this, 'value') /* 第一次默认进行会被收集依赖 */
+    if (this._dirty) {
+      // 通过判断自身依赖的变量是否发生了更新，从而确定自身是否更新
+      this._dirty = false; // 重新计算后，将_dirty置为false
+      this._value =
+        this.effect(); /* 此时调用的函数是从effect函数中返回的，是getter操作被封装成一个effectFn，最后返回的 */
+      (0,_effect__WEBPACK_IMPORTED_MODULE_1__.track)(this, "value"); /* 第一次默认进行会被收集依赖 */
     }
-    return this._value
+    return this._value;
   }
 
   set value(value) {
     /* 判断是否只读！ */
-    console.error("The computed is readonly！")
+    this._setter(value)
   }
 }
 
-function computed(getter) {
-  return new ComputedImpl(getter)
+function computed(getterOrOption) {
+  let getter = () => {}
+  let setter = () => {
+    console.error("The computed is readonly！");
+  };
+
+  let options = (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isFunction)(getterOrOption)
+    ? { getter: getterOrOption, setter }
+    : { getter: getterOrOption.getter || getter, setter: getterOrOption.set || setter };
+  
+  return new ComputedImpl(options)
 }
+
 
 /***/ }),
 
@@ -482,10 +504,17 @@ const calc = window.calc = (0,_reactivity_computed__WEBPACK_IMPORTED_MODULE_0__.
   console.log("此时的 num * 2 =", num.value * 2);
   return num.value * 2;
 })
-;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
-  console.log("此时的calc是：", calc.value) /* 当依赖了计算属性，此时计算属性就会被执行了！如果没有这个依赖，那么只有当调用calc
-  .value才会重新计算！这里因为是依赖于computed的函数会在scheduler中被触发，所以会访问get，最终看到的结果是首次computed也会被计算，
-  可以通过查看注意当前的effect，判断calc的计算！ */
+// effect(() => {
+//   console.log("此时的calc是：", calc.value) /* 当依赖了计算属性，此时计算属性就会被执行了！如果没有这个依赖，那么只有当调用calc
+//   .value才会重新计算！这里因为是依赖于computed的函数会在scheduler中被触发，所以会访问get，最终看到的结果是首次computed也会被计算，
+//   可以通过查看注意当前的effect，判断calc的计算！ */
+// })
+
+const abs = window.abs = (0,_reactivity_computed__WEBPACK_IMPORTED_MODULE_0__.computed)({
+  set(value) {
+    num.value = value
+    console.log("set num value = ", value)
+  }
 })
 })();
 
