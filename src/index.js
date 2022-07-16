@@ -62,8 +62,15 @@ const calc = window.calc = computed(() => {
   console.log("此时的 num * 2 =", num.value * 2);
   return num.value * 2;
 })
-effect(() => {
-  console.log("此时的calc是：", calc.value) /* 当依赖了计算属性，此时计算属性就会被执行了！如果没有这个依赖，那么只有当调用calc
-  .value才会重新计算！这里因为是依赖于computed的函数会在scheduler中被触发，所以会访问get，最终看到的结果是首次computed也会被计算，
-  可以通过查看注意当前的effect，判断calc的计算！ */
+// effect(() => {
+//   console.log("此时的calc是：", calc.value) /* 当依赖了计算属性，此时计算属性就会被执行了！如果没有这个依赖，那么只有当调用calc
+//   .value才会重新计算！这里因为是依赖于computed的函数会在scheduler中被触发，所以会访问get，最终看到的结果是首次computed也会被计算，
+//   可以通过查看注意当前的effect，判断calc的计算！ */
+// })
+
+const abs = window.abs = computed({
+  set(value) {
+    num.value = value /* 可以成功设置！ */
+    console.log("set num value = ", value) 
+  }
 })
