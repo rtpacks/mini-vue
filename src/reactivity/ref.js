@@ -17,7 +17,7 @@ class RefImpl {
     return this._value /* 注意：此时返回的是私有属性的值！ */
   }
   set value(value) { /* 注意：使用ref包装的对象特别注意没有引用对象属性，不会被加入依赖的！
-    reactive函数同样也是如此，必须要使用对象的某一个属性，单纯使用对象不使用某个对象的属性是不会加入依赖的！*/
+    reactive函数同样也是如此，必须要使用对象的某一个属性，单纯使用对象不使用某个对象的属性是不会加入依赖的！而ref一定要使用.value取出才能够获得响应式！*/
     if (!hasChanged(this._value, value)) {
       return ;
     }
@@ -27,7 +27,7 @@ class RefImpl {
 }
 
 /* ref函数用于记忆基本数据类型，引用数据类型都交给reactive函数 */
-/* 因为基本数据类型存储在栈上，所以难以判断是否为同一个对象，用一个对象实现存储，和reactive一样 */
+/* 因为基本数据类型存储在栈上，所以难以判断是否为同一个对象，用一个对象实现存储，和reactive一样。 */
 export function ref(value) {
   if (isRef(value)) {
     return value;
