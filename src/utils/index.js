@@ -3,6 +3,10 @@ export function isObject(target) {
     target !== null 
 }
 
+export function isFunction(getter) {
+  return typeof getter === 'function'
+}
+
 export function isString(target) {
   return typeof target === 'string'
 }

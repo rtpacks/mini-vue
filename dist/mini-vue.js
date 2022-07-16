@@ -2,6 +2,62 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ "./src/reactivity/computed.js":
+/*!************************************!*\
+  !*** ./src/reactivity/computed.js ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "computed": () => (/* binding */ computed)
+/* harmony export */ });
+/* harmony import */ var _effect__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./effect */ "./src/reactivity/effect.js");
+/* 无论是基本数据还是传入的函数，都是放入一个对象中存储，不同的是为了设计computed的缓存特性增加了lazy与scheduler调用
+    lazy避免第一次运行，通过effect函数保存scheduler，最后在trigger中判断是否有调度器，
+    如果有调度器调用调度器，否则才是调用传入的函数
+
+    通过自身的属性_dirty判断自身的依赖是否更新
+    通过get捕获中的track，捕获依赖自身的那些函数
+    通过调度器调用时，进行触发依赖于自身的函数，注意：computed自身的依赖与依赖自身的变量是两个概念！
+ */
+
+
+
+class ComputedImpl {
+  constructor(getter) {
+    this._value = undefined /* 当前的值 */
+    this._dirty = true /* 表示computed依赖的变量有更新，不是依赖computed的函数！ */
+    this.effect = (0,_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(getter, {
+      lazy: true,
+      scheduler: () => { /* 调度器是为了满足缓存的特性而设计的！trigger只会调用调度器，通过调度器控制_ditry来更新，并且不会直接调用 */
+        this._dirty = true /* 当scheduler被调用时，表示的变量发生了更新，但是getter不会被调用，而是自身的value被引用即触发get操作时才会判断_dirty并决定是否重新计算 */
+        ;(0,_effect__WEBPACK_IMPORTED_MODULE_0__.trigger)(this, 'value') /* 通知依赖自身的函数更新，通过get捕获判断_dirty重新计算，注意和trigger函数中进行区分！ */
+      }
+    }) /* 修改effect函数，如果传入了lazy初始默认不执行，如果传入了scheduler，则保存在自身上！ */
+  }
+
+  get value() {
+    if (this._dirty) { // 通过判断自身依赖的变量是否发生了更新，从而确定自身是否更新
+      this._dirty = false // 重新计算后，将_dirty置为false
+      this._value = this.effect() /* 此时调用的函数是从effect函数中返回的，是getter操作被封装成一个effectFn，最后返回的 */
+      ;(0,_effect__WEBPACK_IMPORTED_MODULE_0__.track)(this, 'value') /* 第一次默认进行会被收集依赖 */
+    }
+    return this._value
+  }
+
+  set value(value) {
+    /* 判断是否只读！ */
+    console.error("The computed is readonly！")
+  }
+}
+
+function computed(getter) {
+  return new ComputedImpl(getter)
+}
+
+/***/ }),
+
 /***/ "./src/reactivity/effect.js":
 /*!**********************************!*\
   !*** ./src/reactivity/effect.js ***!
@@ -34,7 +90,7 @@ let effectSet; /* 存储所有依赖于某个对象的某个属性的effect */
 
 let effectStack = [];
 
-function effect(fn) {
+function effect(fn, options = {}) {
   const effectFn = () => {
     let result;
     try {
@@ -57,7 +113,11 @@ function effect(fn) {
       return result;
     }
   };
-  return effectFn();
+  if (!options.lazy) {
+    effectFn();
+  }
+  effectFn.scheduler = options.scheduler;
+  return effectFn;
 }
 
 /* track 收集依赖 */
@@ -88,7 +148,17 @@ function trigger(target, key) {
   targetMap
     .get(target)
     ?.get(key)
-    ?.forEach((effect) => effect());
+    ?.forEach((effect) => {
+      /* 如果有调度器，应该只调用调度器，其余的操作由调度器来完成。
+        这是不同于watchEffect的逻辑，通过调用调度器来实现不立即更新，
+        这是computed依赖的变量更新了，不是要依赖于computed的函数立即更新。
+        scheduler通知_ditry变化，而后scheduler自身中再调用computed的trigger通知依赖自身的函数，
+        达到computed的知道自身依赖的变量更新了，但是不马上计算，
+        只有依赖于自身的函数使用了我，我才判断是否重新计算的功能
+        如果依赖于computed的变量没有访问，那么computed就不会重新计算，
+        因为计算的过程在get捕获中！只有访问了才能重新计算！ */
+      effect.scheduler ? effect.scheduler(effect) : effect();
+    });
 }
 
 
@@ -213,7 +283,7 @@ class RefImpl {
     return this._value /* 注意：此时返回的是私有属性的值！ */
   }
   set value(value) { /* 注意：使用ref包装的对象特别注意没有引用对象属性，不会被加入依赖的！
-    reactive函数同样也是如此，必须要使用对象的某一个属性，单纯使用对象不适用某个对象的属性是不会加入依赖的！*/
+    reactive函数同样也是如此，必须要使用对象的某一个属性，单纯使用对象不使用某个对象的属性是不会加入依赖的！而ref一定要使用.value取出才能够获得响应式！*/
     if (!(0,_utils__WEBPACK_IMPORTED_MODULE_0__.hasChanged)(this._value, value)) {
       return ;
     }
@@ -223,7 +293,7 @@ class RefImpl {
 }
 
 /* ref函数用于记忆基本数据类型，引用数据类型都交给reactive函数 */
-/* 因为基本数据类型存储在栈上，所以难以判断是否为同一个对象，用一个对象实现存储，和reactive一样 */
+/* 因为基本数据类型存储在栈上，所以难以判断是否为同一个对象，用一个对象实现存储，和reactive一样。 */
 function ref(value) {
   if (isRef(value)) {
     return value;
@@ -254,12 +324,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "hasChanged": () => (/* binding */ hasChanged),
 /* harmony export */   "isArray": () => (/* binding */ isArray),
+/* harmony export */   "isFunction": () => (/* binding */ isFunction),
 /* harmony export */   "isObject": () => (/* binding */ isObject),
 /* harmony export */   "isString": () => (/* binding */ isString)
 /* harmony export */ });
 function isObject(target) {
   return typeof target === 'object' && 
     target !== null 
+}
+
+function isFunction(getter) {
+  return typeof getter === 'function'
 }
 
 function isString(target) {
@@ -339,26 +414,28 @@ var __webpack_exports__ = {};
   !*** ./src/index.js ***!
   \**********************/
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _reactivity_effect__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactivity/effect */ "./src/reactivity/effect.js");
-/* harmony import */ var _reactivity_reactive__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./reactivity/reactive */ "./src/reactivity/reactive.js");
-/* harmony import */ var _reactivity_ref__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./reactivity/ref */ "./src/reactivity/ref.js");
+/* harmony import */ var _reactivity_computed__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactivity/computed */ "./src/reactivity/computed.js");
+/* harmony import */ var _reactivity_effect__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./reactivity/effect */ "./src/reactivity/effect.js");
+/* harmony import */ var _reactivity_reactive__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./reactivity/reactive */ "./src/reactivity/reactive.js");
+/* harmony import */ var _reactivity_ref__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./reactivity/ref */ "./src/reactivity/ref.js");
 
 
 
 
-const manager = (window.manager = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_1__.reactive)({
+
+const manager = (window.manager = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_2__.reactive)({
   position: "manager",
   name: "张三",
   age: 18,
 }));
 
-const developer = (window.developer = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_1__.reactive)({
+const developer = (window.developer = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_2__.reactive)({
   position: "developer",
   name: "赵六",
   age: 24,
 }));
 
-const arr = (window.arr = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_1__.reactive)(["zs", "li", "wu"]));
+const arr = (window.arr = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_2__.reactive)(["zs", "li", "wu"]));
 
 // effect(() => {
 //   console.log("developer", developer.age)
@@ -382,24 +459,33 @@ const arr = (window.arr = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_1__.r
 //   console.log("arr[3] = ", arr[3])
 // })
 
-const num = (window.num = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_2__.ref)(1));
-const rarr = (window.rarr = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_2__.ref)([1, 2, 2]));
-const obj = window.obj = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_2__.ref)({
+const num = (window.num = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_3__.ref)(1));
+const rarr = (window.rarr = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_3__.ref)([1, 2, 2]));
+const obj = window.obj = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_3__.ref)({
   name: "张三",
   age: 18
 })
 
-;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(() => {
+;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
   console.log("此时的 num =", num.value); /* 之所以要使用.value的原因就是因为用一个对象来保存基本数据类型了！ */
 });
-(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(() => {
+(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
   console.log("使用ref定义对象类型：rarr[1]=", rarr.value[1]);
 });
-(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(() => {
+(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
   console.log("此时obj.name = ", obj.value.name)
 })
-;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_0__.effect)(() => {
+;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
   console.log("此时obj.age = ", obj.value.age)
+})
+const calc = window.calc = (0,_reactivity_computed__WEBPACK_IMPORTED_MODULE_0__.computed)(() => {
+  console.log("此时的 num * 2 =", num.value * 2);
+  return num.value * 2;
+})
+;(0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(() => {
+  console.log("此时的calc是：", calc.value) /* 当依赖了计算属性，此时计算属性就会被执行了！如果没有这个依赖，那么只有当调用calc
+  .value才会重新计算！这里因为是依赖于computed的函数会在scheduler中被触发，所以会访问get，最终看到的结果是首次computed也会被计算，
+  可以通过查看注意当前的effect，判断calc的计算！ */
 })
 })();
 
