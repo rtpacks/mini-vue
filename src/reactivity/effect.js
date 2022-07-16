@@ -18,7 +18,7 @@ let effectSet; /* 存储所有依赖于某个对象的某个属性的effect */
 
 let effectStack = [];
 
-export function effect(fn) {
+export function effect(fn, options = {}) {
   const effectFn = () => {
     let result;
     try {
@@ -41,7 +41,11 @@ export function effect(fn) {
       return result;
     }
   };
-  return effectFn();
+  if (!options.lazy) {
+    effectFn();
+  }
+  effectFn.scheduler = options.scheduler;
+  return effectFn;
 }
 
 /* track 收集依赖 */
@@ -72,5 +76,15 @@ export function trigger(target, key) {
   targetMap
     .get(target)
     ?.get(key)
-    ?.forEach((effect) => effect());
+    ?.forEach((effect) => {
+      /* 如果有调度器，应该只调用调度器，其余的操作由调度器来完成。
+        这是不同于watchEffect的逻辑，通过调用调度器来实现不立即更新，
+        这是computed依赖的变量更新了，不是要依赖于computed的函数立即更新。
+        scheduler通知_ditry变化，而后scheduler自身中再调用computed的trigger通知依赖自身的函数，
+        达到computed的知道自身依赖的变量更新了，但是不马上计算，
+        只有依赖于自身的函数使用了我，我才判断是否重新计算的功能
+        如果依赖于computed的变量没有访问，那么computed就不会重新计算，
+        因为计算的过程在get捕获中！只有访问了才能重新计算！ */
+      effect.scheduler ? effect.scheduler(effect) : effect();
+    });
 }
