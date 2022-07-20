@@ -128,7 +128,7 @@ function mountFragment(vnode, container, anchor) {
   container.appendChild(endAnchor);
   // container.insertBefore(startAnchor, anchor)
   // container.insertBefore(endAnchor, anchor)
-  
+
   mountChildren(vnode.children, container, endAnchor);
 }
 
@@ -141,7 +141,18 @@ function mountChildren(children, container, anchor) {
 // function unmountElement(vnode) {}
 // function unmountText(vnode) {}
 
-function unmountFragment(vnode) {}
+function unmountFragment(vnode) {
+  // 添加了anchor后，还需要删除刚开始添加的两个子元素，不能直接调用unmountChildren
+  let { el: curr, anchor } = vnode;
+  const parent = el.parentNode;
+  while (curr !== anchor) {
+    /* anchor是最后一个节点 */
+    let next = curr.nextSibling();
+    parent.removeChild(curr);
+    curr = next;
+  }
+  parent.removeChild(anchor);
+}
 function unmountComponent(vnode) {}
 
 function unmountChildren(children) {
