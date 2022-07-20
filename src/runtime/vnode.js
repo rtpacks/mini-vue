@@ -56,6 +56,7 @@ export function h(type, props, children) {
     props,
     children,
     shapeFlag,
-    el: null /* 代表当前虚拟dom对应的真实dom */
+    el: null, /* 代表当前虚拟dom对应的真实dom */
+    anchor: null, /* 锚用于定位 */
   };
 }
