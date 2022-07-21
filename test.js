@@ -12,3 +12,5 @@ const obj = {1:1,2:2,3:2,4:4}
 for (const key in obj) {
   console.log(key, obj[key])
 }
+
+console.log([1,2,3,4].slice(1))
