@@ -59,10 +59,11 @@ function patch(_vnode, vnode, container, anchor) {
   }
   if (!isSameVNodeType(_vnode, vnode)) {
     /* 如果旧vnode存在，但是和新产生的vnode不一样，卸载旧vnode，挂载新vnode */
+    /* 如果不是相同的节点，设置下一个节点为anchor，即在下一个节点前进行插入才是正确的，
+    但是对于Fragment多设置了一个endAnchor */
+    anchor = (_vnode.anchor || _vnode.el).nextSibling()
     unmount(_vnode);
     _vnode = null;
-    // todo
-    return;
   }
   /* 同类型vnode，shapeFlag相同 */
   const { shapeFlag } = vnode;
