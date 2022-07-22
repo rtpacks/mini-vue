@@ -258,6 +258,38 @@ function convert(value) {
 
 /***/ }),
 
+/***/ "./src/runtime/createApp.js":
+/*!**********************************!*\
+  !*** ./src/runtime/createApp.js ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "createApp": () => (/* binding */ createApp)
+/* harmony export */ });
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
+/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+
+
+
+
+function createApp(root) {
+  const app = {
+    mount(container) {
+      if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(container)) {
+        container = document.querySelector(container);
+      }
+      (0,_renderer__WEBPACK_IMPORTED_MODULE_1__.render)((0,_vnode__WEBPACK_IMPORTED_MODULE_2__.h)(root), container);
+    },
+  };
+  return app;
+}
+
+
+/***/ }),
+
 /***/ "./src/runtime/index.js":
 /*!******************************!*\
   !*** ./src/runtime/index.js ***!
@@ -266,15 +298,22 @@ function convert(value) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "Fragment": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_1__.Fragment),
-/* harmony export */   "ShapeFlags": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags),
-/* harmony export */   "Text": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_1__.Text),
-/* harmony export */   "h": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_1__.h),
-/* harmony export */   "mount": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_0__.mount),
-/* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_0__.render)
+/* harmony export */   "Fragment": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.Fragment),
+/* harmony export */   "ShapeFlags": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.ShapeFlags),
+/* harmony export */   "Text": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.Text),
+/* harmony export */   "createApp": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_3__.createApp),
+/* harmony export */   "h": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.h),
+/* harmony export */   "mount": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.mount),
+/* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_0__.nextTick),
+/* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render)
 /* harmony export */ });
-/* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
-/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
+/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
+
+
+
 
 
 
@@ -916,7 +955,6 @@ var __webpack_exports__ = {};
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reactivity_ref__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactivity/ref */ "./src/reactivity/ref.js");
 /* harmony import */ var _runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./runtime */ "./src/runtime/index.js");
-/* harmony import */ var _runtime_scheduler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./runtime/scheduler */ "./src/runtime/scheduler.js");
 
 
 
@@ -989,7 +1027,45 @@ __webpack_require__.r(__webpack_exports__);
 
 // render(vnode, document.body);
 
-const Comp = {
+// const Comp = {
+//   setup() {
+//     const count = ref(0);
+
+//     const add = () => {
+//       count.value += 3;
+//     };
+//     const sub = () => {
+//       count.value -= 3;
+//     };
+//     const dateTime = ref(new Date().toLocaleString());
+//     // setInterval(() => {
+//     //   dateTime.value = new Date().toLocaleString()
+//     // }, 1000);
+//     console.log("setup执行");
+
+//     return {
+//       count,
+//       add,
+//       sub,
+//       dateTime,
+//     };
+//   },
+//   render(ctx) {
+//     console.log("render执行");
+//     return [
+//       h("div", null, `counter: ${ctx.count.value}`) /* 并没有处理去掉value */,
+//       h("button", { onClick: ctx.sub }, "-"),
+//       h("button", { onClick: ctx.add }, "+"),
+//       h("div", null, `DateTime：${ctx.dateTime.value}`),
+//     ];
+//   },
+// };
+// const vnode = h(Comp, null);
+// render(vnode, document.body);
+
+
+
+(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.createApp)({
   setup() {
     const count = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)(0);
 
@@ -1021,9 +1097,7 @@ const Comp = {
       (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("div", null, `DateTime：${ctx.dateTime.value}`),
     ];
   },
-};
-const vnode = (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)(Comp, null);
-(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.render)(vnode, document.body);
+}).mount(document.body)
 
 })();
 

@@ -1,6 +1,6 @@
 import { ref } from "./reactivity/ref";
 import { render, h, Fragment, Text } from "./runtime";
-import { nextTick } from "./runtime/scheduler";
+import { createApp } from "./runtime"
 
 // const vnode = h(
 //   "div",
@@ -70,7 +70,45 @@ import { nextTick } from "./runtime/scheduler";
 
 // render(vnode, document.body);
 
-const Comp = {
+// const Comp = {
+//   setup() {
+//     const count = ref(0);
+
+//     const add = () => {
+//       count.value += 3;
+//     };
+//     const sub = () => {
+//       count.value -= 3;
+//     };
+//     const dateTime = ref(new Date().toLocaleString());
+//     // setInterval(() => {
+//     //   dateTime.value = new Date().toLocaleString()
+//     // }, 1000);
+//     console.log("setup执行");
+
+//     return {
+//       count,
+//       add,
+//       sub,
+//       dateTime,
+//     };
+//   },
+//   render(ctx) {
+//     console.log("render执行");
+//     return [
+//       h("div", null, `counter: ${ctx.count.value}`) /* 并没有处理去掉value */,
+//       h("button", { onClick: ctx.sub }, "-"),
+//       h("button", { onClick: ctx.add }, "+"),
+//       h("div", null, `DateTime：${ctx.dateTime.value}`),
+//     ];
+//   },
+// };
+// const vnode = h(Comp, null);
+// render(vnode, document.body);
+
+
+
+createApp({
   setup() {
     const count = ref(0);
 
@@ -102,6 +140,4 @@ const Comp = {
       h("div", null, `DateTime：${ctx.dateTime.value}`),
     ];
   },
-};
-const vnode = h(Comp, null);
-render(vnode, document.body);
+}).mount(document.body)
