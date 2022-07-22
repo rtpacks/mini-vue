@@ -1,4 +1,4 @@
-import { isArray, isNumber, isString } from "../utils";
+import { isArray, isNumber, isObject, isString } from "../utils";
 
 export const ShapeFlags = {
   ELEMENT: 1, // 00000001
@@ -59,4 +59,16 @@ export function h(type, props, children) {
     el: null, /* 代表当前虚拟dom对应的真实dom */
     anchor: null, /* 锚用于定位 */
   };
+}
+
+export function normalizeVNode(vnode) {
+  if (isArray(vnode)) {
+    return h(Fragment, null, vnode)
+  }
+  if (isObject(vnode)) {
+    return vnode
+  }
+  if (isString(vnode) || isNumber(vnode)) {
+    return h(Text, null, vnode.toString())
+  }
 }
