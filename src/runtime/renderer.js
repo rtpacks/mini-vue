@@ -1,4 +1,7 @@
-import { ShapeFlags } from "./vnode";
+import { reactive } from "../reactivity/reactive";
+import { h, normalizeVNode, ShapeFlags } from "./vnode";
+import { isFunction } from "../utils";
+import { effect } from "../reactivity/effect";
 
 /**
  * render 渲染VNode，虚拟DOM很多种类型，相应的挂载到真实DOM上也是很多方式，也就是很多种类型的unmount/patch函数
@@ -61,7 +64,7 @@ function patch(_vnode, vnode, container, anchor) {
     /* 如果旧vnode存在，但是和新产生的vnode不一样，卸载旧vnode，挂载新vnode */
     /* 如果不是相同的节点，设置下一个节点为anchor，即在下一个节点前进行插入才是正确的，
     但是对于Fragment多设置了一个endAnchor */
-    anchor = (_vnode.anchor || _vnode.el).nextSibling()
+    anchor = (_vnode.anchor || _vnode.el).nextSibling();
     unmount(_vnode);
     _vnode = null;
   }
@@ -133,7 +136,64 @@ function mountFragment(vnode, container, anchor) {
   mountChildren(vnode.children, container, endAnchor);
 }
 
-function mountComponent(vnode, container) {}
+function mountComponent(vnode, container, anchor) {
+  // 组件是一个对象，由两个阶段生成，vue3的组件和react的类式组件非常类似，都具有render函数，通过render产出vnode
+  // 第一阶段是原生的不经过h函数包裹的对象，此时是组件对象如 {props:[], render() {return h('div', null, "我是小明")}}
+  // 第二阶段是经过h函数包裹的对象，此时是vnode对象 如 h(Comp, vnodeProps);
+  // 对于vnode的props属性，有两种情况：第一是内部使用的props父传子，第二是组件本身的attrs标签属性，两者不同
+
+  const { type: Component, props: vnodeProps } = vnode; /* 获取组件对象 */
+
+  const instance = {
+    props: null,
+    attrs: null,
+
+    setupState: null,
+    ctx: null,
+
+    subTree: null,
+    patch: null,
+  };
+  // initProps() 区分不同的属性
+  instance.props ||= {};
+  instance.attrs ||= {};
+  for (const key in vnodeProps) {
+    if (Component.props?.includes(key)) {
+      instance.props[key] = vnodeProps[key];
+    } else {
+      instance.attrs[key] = vnodeProps[key];
+    }
+  }
+  instance.props = reactive(instance.props); /* 做响应式处理 */
+
+  // 对于vue3，执行setup函数，获取返回值setupState，通过effect确定响应数据，最终通过render产出vnode，render接收ctx
+  instance.setupState = Component.setup?.(instance.props, {
+    attrs: instance.attrs,
+  });
+  instance.ctx = {
+    ...instance.props,
+    ...instance.setupState,
+  };
+
+  // 执行render函数
+  instance.patch = () => {
+    const preTree = instance.subTree;
+    /* 生成vnode，并保存在自身的subTree中，作为原有的subTree */
+    const subTree = (instance.subTree = normalizeVNode(
+      Component.render(instance.ctx)
+    ));
+    vnode.el = subTree.el = preTree ? preTree.el : null;
+    /* 根据vue文档，当返回单个根节点时，非instance.props的vnodeProps，将自动添加到根节点的attribute中，即将instance.attrs添加到根节点的attributes中 */
+    subTree.props = {
+      ...(subTree.props || {}),
+      ...(instance.attrs || {}),
+    };
+    /* 并不会造成递归调用形式，因为render函数生成vnode不再是comp了 */
+    patch(preTree, subTree, container, anchor);
+  };
+  /* 通过effect默认执行代表mount，当相应的变量发生改变时也会重新执行 */
+  effect(instance.patch);
+}
 
 function mountChildren(children, container, anchor) {
   children.forEach((child) => mount(child, container, anchor));
@@ -159,6 +219,7 @@ function unmountComponent(vnode) {}
 function unmountChildren(children) {
   children.forEach((child) => unmount(child));
 }
+
 function patchElement(_vnode, vnode, container) {
   /* 不再需要检查_vnode是否存在 */
   vnode.el = _vnode.el;
@@ -178,7 +239,7 @@ function patchFragment(_vnode, vnode, container) {
   patchChildren(_vnode, vnode, container, endAnchor);
 }
 
-function patchComponent(_vnode, vnode) {}
+function patchComponent(_vnode, vnode, anchor) {}
 
 function patchChildren(_vnode, vnode, container, anchor) {
   /* 更新children函数 */
@@ -220,6 +281,7 @@ function patchChildren(_vnode, vnode, container, anchor) {
   }
 }
 
+/* patchUnkeyChildren，后续完善diff过程 */
 function patchArrayChildren(_children, children, container, anchor) {
   const [_len, len] = [_children.length, children.length];
   const baseLen = Math.min(_len, len);
