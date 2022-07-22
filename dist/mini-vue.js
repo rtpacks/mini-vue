@@ -296,6 +296,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
 /* harmony import */ var _reactivity_effect__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../reactivity/effect */ "./src/reactivity/effect.js");
+/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+
 
 
 
@@ -490,7 +492,10 @@ function mountComponent(vnode, container, anchor) {
     patch(preTree, subTree, container, anchor);
   };
   /* 通过effect默认执行代表mount，当相应的变量发生改变时也会重新执行 */
-  (0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_3__.effect)(instance.patch);
+  (0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_3__.effect)(instance.patch, {
+    scheduler:
+      _scheduler__WEBPACK_IMPORTED_MODULE_4__.scheduler /* 如果有scheduler，那么trigger会优先执行scheduler，并将传入的fn，传入到scheduler中 */,
+  });
 }
 
 function mountChildren(children, container, anchor) {
@@ -653,6 +658,60 @@ function patchSingleProp(_value, value, key, el) {
         el.setAttribute(key, value);
       }
   }
+}
+
+
+/***/ }),
+
+/***/ "./src/runtime/scheduler.js":
+/*!**********************************!*\
+  !*** ./src/runtime/scheduler.js ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "nextTick": () => (/* binding */ nextTick),
+/* harmony export */   "scheduler": () => (/* binding */ scheduler)
+/* harmony export */ });
+// 调度的出现是为了性能的提高，即通过合并相同的操作，只执行一次渲染，这样就可以提高性能，调度的实现和计算属性的实现是很类似的
+/**
+ * scheduler是一个类似节流的过程，
+ */
+let jobs = [];
+
+function scheduler(job) {
+  // 如果队列不包含相同的job，进行push
+  if (!jobs.includes(job)) {
+    jobs.push(job);
+    flushJobs(); /* 类似节流函数 */
+  }
+}
+
+let isFlushing = false;
+const RESOLVED = Promise.resolve();
+let curr = null;
+function flushJobs() {
+  if (!isFlushing) {
+    isFlushing = true; /* 在刷新job的过程中，可能还会有push过程 */
+    curr = RESOLVED.then(() => {
+      /* 将render函数放入到微任务队列中，也就是一个类似节流的过程 */
+      jobs.forEach((job) => job());
+    })
+      .catch(console.log)
+      .finally(() => {
+        isFlushing = false;
+        jobs = []; /* 清空 */
+      });
+  }
+}
+
+function nextTick(fn) {
+  return curr /* 如果队列中存在任务，那么需要使用当前的promise，如果不存在则使用RESOLVED */
+    ? curr.then(fn).finally(() => {
+        curr = null;
+      })
+    : RESOLVED.then(fn);
 }
 
 
@@ -857,6 +916,8 @@ var __webpack_exports__ = {};
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reactivity_ref__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactivity/ref */ "./src/reactivity/ref.js");
 /* harmony import */ var _runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./runtime */ "./src/runtime/index.js");
+/* harmony import */ var _runtime_scheduler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./runtime/scheduler */ "./src/runtime/scheduler.js");
+
 
 
 
@@ -931,13 +992,19 @@ __webpack_require__.r(__webpack_exports__);
 const Comp = {
   setup() {
     const count = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)(0);
-    const add = () => count.value++;
-    const sub = () => count.value--;
-    const dateTime = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)("2022-07-22 00:00:00");
-    setInterval(() => {
-      dateTime.value = new Date().toLocaleString()
-    }, 1000);
+
+    const add = () => {
+      count.value += 3;
+    };
+    const sub = () => {
+      count.value -= 3;
+    };
+    const dateTime = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)(new Date().toLocaleString());
+    // setInterval(() => {
+    //   dateTime.value = new Date().toLocaleString()
+    // }, 1000);
     console.log("setup执行");
+
     return {
       count,
       add,
@@ -946,6 +1013,7 @@ const Comp = {
     };
   },
   render(ctx) {
+    console.log("render执行");
     return [
       (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("div", null, `counter: ${ctx.count.value}`) /* 并没有处理去掉value */,
       (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("button", { onClick: ctx.sub }, "-"),
