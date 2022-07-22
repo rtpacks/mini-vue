@@ -2,6 +2,7 @@ import { reactive } from "../reactivity/reactive";
 import { h, normalizeVNode, ShapeFlags } from "./vnode";
 import { isFunction } from "../utils";
 import { effect } from "../reactivity/effect";
+import { scheduler } from "./scheduler";
 
 /**
  * render 渲染VNode，虚拟DOM很多种类型，相应的挂载到真实DOM上也是很多方式，也就是很多种类型的unmount/patch函数
@@ -192,7 +193,10 @@ function mountComponent(vnode, container, anchor) {
     patch(preTree, subTree, container, anchor);
   };
   /* 通过effect默认执行代表mount，当相应的变量发生改变时也会重新执行 */
-  effect(instance.patch);
+  effect(instance.patch, {
+    scheduler:
+      scheduler /* 如果有scheduler，那么trigger会优先执行scheduler，并将传入的fn，传入到scheduler中 */,
+  });
 }
 
 function mountChildren(children, container, anchor) {
