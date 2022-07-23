@@ -45,9 +45,24 @@
 // }
 // console.log(ans / 20)
 
+// slice 将截取的返回
 
-const s = "    woshi   "
-console.log(s.match(/^([\t\r\n\f ])+/))
+const s = "    woshi   ";
+console.log(s.match(/^([\t\r\n\f ])+/));
 
 // console.log(s.substring(0, s.indexOf("w")))
-console.log(s.slice(s.indexOf("w")))
+console.log(s.slice(0, s.indexOf("w")));
+console.log(s.slice(s.indexOf("w")));
+
+const div = "<div> Hello </div>";
+const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(div);
+console.log(match);
+
+/* () 和 , 表示运算符，特别是,逗号运算符，会返回后一个表达式 */
+console.log((1, 2));
+console.log((1, 2, 3, 4));
+/* 对于中括号[]来说，也会有比较奇怪的时候，但是请记住：js的数组是对象！对象可以用[]取值 
+第一个中括号表示数组对象，第二个中括号表示用key取值，[1][0]==1, [1][1]==undefined */
+
+// [1,2,3,4]对象，[1,2]==[(1,2)]=[2]，所以[1,2,3,4][1,2]=[1,2,3,4][2]=3
+console.log([1, 2, 3, 4][(1, 2)]); 
