@@ -5,6 +5,7 @@ export function parse(content) {
   /* 保存原有字符串，并加上一些配置信息 */
   const context = createParseContext(content);
   /* 通过context及配置信息，编译children的ast */
+  // debugger
   const children = parseChildren(context);
   /* 生成编译后带有根节点的初始抽象语法树 */
   return createRoot(children);
@@ -138,6 +139,7 @@ function parseTag(context) {
   const isSelfClosing =
     context.source.startsWith("/>") || context.options.isVoidTag(tag);
   advanceBy(context, isSelfClosing ? 2 : 1); // 自闭合截取2，非自闭合截取1
+  advanceSpaces(context) // 每当advanceBy后，需要注意去掉空格，但是不一定是一次advanceBy就一次advanceSpaces()
 
   const tagType = isComponent(context, tag)
     ? ElementTypes.COMPONENT
