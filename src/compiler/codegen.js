@@ -14,10 +14,9 @@ export function generate(ast) {
 function traverseNode(node) {
   switch (node.type) {
     case NodeTypes.ROOT:
-      console.log(node.children);
       return traverseNode(node.children[0]);
     case NodeTypes.ELEMENT:
-      return;
+      return createElementVNode(node);
     case NodeTypes.INTERPOLATION:
       return createInterpolationVNode(node);
     case NodeTypes.TEXT:
@@ -39,4 +38,25 @@ function createTextVNode(node) {
 function createInterpolationVNode(node) {
   // return `h(Text, null, ${node.content.content})`;
   return `h(Text, null, ${createText(node.content)})`;
+}
+
+function createElementVNode(node) {
+  const tag = createText({ content: node.tag }); //创建文本
+  /* 不需要单独的判断子元素的个数，通过遍历即可 */
+  const children = traverseChildren(node);
+  return `h(${tag}, null, ${children})`;
+}
+
+function traverseChildren(node) {
+  const { children } = node;
+  // 多级嵌套需要使用递归的形式进行解析，h函数中，子元素应该使用中括号包裹
+  return (
+    "[" +
+    children
+      .map((child) => {
+        return traverseNode(child);
+      })
+      .join(", ") +
+    "]"
+  );
 }
