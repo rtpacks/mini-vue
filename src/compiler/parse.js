@@ -29,10 +29,10 @@ function parseChildren(context) {
     // 1. 解析元素节点，包括解析标签内部属性、指令等
     // 2. 解析内部节点：分为两个 文本节点和插值节点
     let node = null;
-    if (s.startWith(context.options.delimiters[0])) {
+    if (s.startsWith(context.options.delimiters[0])) {
       // 如果是给定的分割符号
       node = parseInterpolation(context);
-    } else if (s.startWith("<")) {
+    } else if (s.startsWith("<")) {
       // 如果是一个起始的标签
       node = parseElement(context);
     } else {
@@ -42,14 +42,49 @@ function parseChildren(context) {
     nodes.push(node);
   }
 
-  
+  let removedWhiteSpaces = false;
+  // 对空白字符做优化处理
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node.type === NodeTypes.TEXT) {
+      // 如果是文本节点，区分文本节点内容是否全是空白
+      // /^[\t\r\n\f ]*$/
+      // debugger
+      if (/[^\t\r\n\f ]/.test(node.content)) {
+        /* 如果文本内容有一些字符 */
+        node.content = node.content.replace(/[\t\r\n\f ]+/g, " "); // 将多个空格替换成一个空格
+      } else {
+        /* 如果全是空白，做出一些判断进行节点的删除 */
+        const prev = nodes[i - 1];
+        const next = nodes[i + 1];
+        // 如果其中一个为undefined或前后一个都是元素节点，并且node带有换行符，删除节点
+        if (
+          !prev ||
+          !next ||
+          (prev.type === NodeTypes.ELEMENT &&
+            next.type === NodeTypes.ELEMENT &&
+            /[\r\n]/.test(node.content))
+        ) {
+          /* 删除节点 */
+          removedWhiteSpaces = true;
+          nodes[i] = null;
+        } else {
+          node.content = " ";
+        }
+      }
+    }
+  }
 
-  return nodes;
+  return removedWhiteSpaces
+    ? nodes.filter((node) => {
+        return !node;
+      })
+    : nodes;
 }
 
 function isTextEnd(context) {
   const s = context.source;
-  return s.startWith("</") || s === "";
+  return s === "" || s.startsWith("</");
 }
 
 function parseInterpolation(context) {
@@ -76,13 +111,17 @@ function parseElement(context) {
   // 1. 开始标签
   // 2. children
   // 3. 结束标签
+  // debugger;
+
   const element = parseTag(context); // 开始标签
   if (element.isSelfClosing) {
     // 如果是自闭合的标签，可以返回
     return element;
   }
+  // debugger
   element.children = parseChildren(context); // children
   parseTag(context); // 结束标签
+  return element;
 }
 
 function parseTag(context) {
@@ -97,10 +136,10 @@ function parseTag(context) {
 
   // 自闭合形式，但是<br>也是正确的，需要另外一个函数的辅助
   const isSelfClosing =
-    context.source.startWith("/>") || context.options.isVoidTag(tag);
+    context.source.startsWith("/>") || context.options.isVoidTag(tag);
   advanceBy(context, isSelfClosing ? 2 : 1); // 自闭合截取2，非自闭合截取1
 
-  const tagType = isComponent(tag)
+  const tagType = isComponent(context, tag)
     ? ElementTypes.COMPONENT
     : ElementTypes.ELEMENT;
 
@@ -121,10 +160,10 @@ function parseAttributes(context) {
 
   function isTagEnd(context) {
     const s = context.source;
-    return s === "" || s.startWith(">") || s.startWith("/>");
+    return s === "" || s.startsWith(">") || s.startsWith("/>");
   }
 
-  while (isTagEnd(context)) {
+  while (!isTagEnd(context)) {
     const attr = parseSingleAttribute(context);
     if (attr.type === NodeTypes.DIRECTIVE) {
       directives.push(attr);
@@ -163,7 +202,7 @@ function parseSingleAttribute(context) {
     } else if (name[0] === "@") {
       dirName = "on";
       arg = name.slice(1);
-    } else if (name.startWith("v-")) {
+    } else if (name.startsWith("v-")) {
       [dirName, arg] = name.slice(2).split(":");
     }
 
@@ -208,7 +247,7 @@ function parseAttributeValue(context) {
 }
 
 function parseText(context) {
-  const endTags = ["</", context.options.delimiters];
+  const endTags = ["</", context.options.delimiters[0]];
 
   // 三种结束方式
   // 1. 遇到插值的分隔符{{
@@ -216,7 +255,7 @@ function parseText(context) {
   // 3. 一行的末尾
   let textLen = context.source.length;
   textLen = endTags.reduce((prev, tag) => {
-    const idx = context.source.findIndex(tag);
+    const idx = context.source.indexOf(tag);
     if (idx !== -1) {
       prev = Math.min(prev, idx);
     }
@@ -247,7 +286,7 @@ function advanceSpaces(context) {
   const match = /^[\t\r\n\f ]+/.exec(context.source);
   // 如果匹配到相应的空白字符串
   if (match) {
-    context.source = advanceBy(context, match[0].length); // 第一个就是匹配成功的空白字符串
+    advanceBy(context, match[0].length); // 第一个就是匹配成功的空白字符串
   }
 }
 
