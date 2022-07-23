@@ -92,9 +92,11 @@ function parseInterpolation(context) {
   // 一种形式：遇到左大括号，即分隔符好的左符号
   const [open, close] = context.options.delimiters;
   advanceBy(context, open.length); // 移除左边分割符号
+  advanceSpaces(context)
   const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
   const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
   advanceBy(context, close.length); // 移除右边分隔符号
+  advanceSpaces(context)
 
   return {
     type: NodeTypes.INTERPOLATION,
@@ -249,7 +251,8 @@ function parseAttributeValue(context) {
 }
 
 function parseText(context) {
-  const endTags = ["</", context.options.delimiters[0]];
+  /* 注意：结束的标志不是</，而是<，因为中间还可以子元素节点 */
+  const endTags = ["<", context.options.delimiters[0]];
 
   // 三种结束方式
   // 1. 遇到插值的分隔符{{
