@@ -36,11 +36,18 @@
 //     console.log(hello);
 //   });
 
-let ans = 0
-let s = "6463375576651656565"
-s = "26376256545637532656"
-for (const d of s) {
-  ans += parseInt(d)
-  console.log(d);
-}
-console.log(ans / 20)
+// let ans = 0
+// let s = "6463375576651656565"
+// s = "26376256545637532656"
+// for (const d of s) {
+//   ans += parseInt(d)
+//   console.log(d);
+// }
+// console.log(ans / 20)
+
+
+const s = "    woshi   "
+console.log(s.match(/^([\t\r\n\f ])+/))
+
+// console.log(s.substring(0, s.indexOf("w")))
+console.log(s.slice(s.indexOf("w")))
