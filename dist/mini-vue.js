@@ -2,6 +2,535 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ "./src/compiler/ast.js":
+/*!*****************************!*\
+  !*** ./src/compiler/ast.js ***!
+  \*****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ElementTypes": () => (/* binding */ ElementTypes),
+/* harmony export */   "NodeTypes": () => (/* binding */ NodeTypes),
+/* harmony export */   "createRoot": () => (/* binding */ createRoot)
+/* harmony export */ });
+/* 定义不同的节点类型，如元素节点、属性节点、指令节点、文本节点、插值节点等，共有七种类型 */
+const NodeTypes = {
+  ROOT: "ROOT" /* 根节点 */,
+  ELEMENT: "ELEMENT" /* 元素节点 */,
+  TEXT: "TEXT" /* 文本节点 */,
+  SIMPLE_EXPRESSION: "SIMPLE_EXPRESSION" /* 表达式节点 */,
+  INTERPOLATION: "INTERPOLATION" /* 插值节点 mustache语法 */,
+  ATTRIBUTE: "ATTRIBUTE" /* 属性节点 */,
+  DIRECTIVE: "DIRECTIVE" /* 指令节点 */,
+};
+
+const ElementTypes = {
+  ELEMENT: "ELEMENT" /* 普通标签 */,
+  COMPONENT: "COMPONENT" /* 组件，自定义标签 */,
+};
+
+function createRoot(children) {
+  return {
+    type: NodeTypes.ROOT,
+    children,
+  };
+}
+
+
+/***/ }),
+
+/***/ "./src/compiler/codegen.js":
+/*!*********************************!*\
+  !*** ./src/compiler/codegen.js ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "generate": () => (/* binding */ generate)
+/* harmony export */ });
+/* harmony import */ var ___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! . */ "./src/compiler/index.js");
+
+
+// 接受一段语法树，返回对应可执行的代码，通过 new Function | eval 创建一段可执行代码
+function generate(ast) {
+  return traverseNode(ast);
+}
+
+/**
+ * 编译节点树，关注四个基本的节点类型，生成h函数的字符串
+ * 注意，这些函数都是生成h函数的代码，即一段代码文本，而不是直接执行函数
+ * @param {*} node
+ * @returns
+ */
+function traverseNode(node) {
+  switch (node.type) {
+    case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ROOT:
+      console.log(node.children);
+      return traverseNode(node.children[0]);
+    case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ELEMENT:
+      return;
+    case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.INTERPOLATION:
+      return createInterpolationVNode(node);
+    case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.TEXT:
+      return createTextVNode(node);
+    default:
+      break;
+  }
+}
+
+/* 通过isStatic来判断是否为静态节点，从而生成对应的代码片段，如插值不需要引号，静态文本需要引号，注意是生成可执行的代码片段 */
+function createText({ isStatic = true, content = "" } = {}) {
+  return isStatic ? JSON.stringify(content) : content;
+}
+
+function createTextVNode(node) {
+  return `h(Text, null, ${createText(node)})`;
+}
+/* 将插值节点也看成是虚拟dom的Text类型 */
+function createInterpolationVNode(node) {
+  // return `h(Text, null, ${node.content.content})`;
+  return `h(Text, null, ${createText(node.content)})`;
+}
+
+
+/***/ }),
+
+/***/ "./src/compiler/compile.js":
+/*!*********************************!*\
+  !*** ./src/compiler/compile.js ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "compile": () => (/* binding */ compile)
+/* harmony export */ });
+/* harmony import */ var _codegen__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./codegen */ "./src/compiler/codegen.js");
+/* harmony import */ var _parse__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./parse */ "./src/compiler/parse.js");
+
+
+
+function compile(template) {
+  const ast = (0,_parse__WEBPACK_IMPORTED_MODULE_1__.parse)(template); // 解析模板得到ast
+  const code = (0,_codegen__WEBPACK_IMPORTED_MODULE_0__.generate)(ast); // 解析ast得到一段可执行的代码
+  return code;
+}
+
+
+/***/ }),
+
+/***/ "./src/compiler/index.js":
+/*!*******************************!*\
+  !*** ./src/compiler/index.js ***!
+  \*******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ElementTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.ElementTypes),
+/* harmony export */   "NodeTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes),
+/* harmony export */   "createRoot": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.createRoot),
+/* harmony export */   "parse": () => (/* reexport safe */ _parse__WEBPACK_IMPORTED_MODULE_0__.parse)
+/* harmony export */ });
+/* harmony import */ var _parse__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./parse */ "./src/compiler/parse.js");
+/* harmony import */ var _ast__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ast */ "./src/compiler/ast.js");
+
+
+
+
+/***/ }),
+
+/***/ "./src/compiler/parse.js":
+/*!*******************************!*\
+  !*** ./src/compiler/parse.js ***!
+  \*******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "parse": () => (/* binding */ parse)
+/* harmony export */ });
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _ast__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ast */ "./src/compiler/ast.js");
+
+
+
+function parse(content) {
+  /* 保存原有字符串，并加上一些配置信息 */
+  const context = createParseContext(content);
+  /* 通过context及配置信息，编译children的ast */
+  const children = parseChildren(context);
+  /* 生成编译后带有根节点的初始抽象语法树 */
+  return (0,_ast__WEBPACK_IMPORTED_MODULE_1__.createRoot)(children);
+}
+
+function createParseContext(content) {
+  return {
+    options: {
+      delimiters: ["{{", "}}"], //分隔符，可配置,
+      isVoidTag: _utils__WEBPACK_IMPORTED_MODULE_0__.isVoidTag, // 为了跨平台设计的
+      isNativeTag: _utils__WEBPACK_IMPORTED_MODULE_0__.isNativeTag,
+    },
+    source: content, //source保存原有的模板字符串 */
+  };
+}
+
+function parseChildren(context) {
+  let nodes = [];
+  while (!isTextEnd(context)) {
+    const s = context.source;
+    // 分为三个阶段，
+    // 1. 解析元素节点，包括解析标签内部属性、指令等
+    // 2. 解析内部节点：分为两个 文本节点和插值节点
+    let node = null;
+    if (s.startsWith(context.options.delimiters[0])) {
+      // 如果是给定的分割符号
+      node = parseInterpolation(context);
+    } else if (s.startsWith("<")) {
+      // 如果是一个起始的标签
+      node = parseElement(context);
+    } else {
+      // 文本节点，假设给定的内容就是正常的，不含有特殊的符号
+      node = parseText(context);
+    }
+    nodes.push(node);
+  }
+
+  let removedWhiteSpaces = false;
+  // 对空白字符做优化处理
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node.type === _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.TEXT) {
+      // 如果是文本节点，区分文本节点内容是否全是空白
+      // /^[\t\r\n\f ]*$/
+      // debugger
+      if (/[^\t\r\n\f ]/.test(node.content)) {
+        /* 如果文本内容有一些字符 */
+        node.content = node.content.replace(/[\t\r\n\f ]+/g, " "); // 将多个空格替换成一个空格
+      } else {
+        /* 如果全是空白，做出一些判断进行节点的删除 */
+        const prev = nodes[i - 1];
+        const next = nodes[i + 1];
+        // 如果其中一个为undefined或前后一个都是元素节点，并且node带有换行符，删除节点
+        if (
+          !prev ||
+          !next ||
+          (prev.type === _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.ELEMENT &&
+            next.type === _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.ELEMENT &&
+            /[\r\n]/.test(node.content))
+        ) {
+          /* 删除节点 */
+          removedWhiteSpaces = true;
+          nodes[i] = null;
+        } else {
+          node.content = " ";
+        }
+      }
+    }
+  }
+
+  return removedWhiteSpaces
+    ? nodes.filter((node) => {
+        return !node;
+      })
+    : nodes;
+}
+
+function isTextEnd(context) {
+  const s = context.source;
+  return s === "" || s.startsWith("</");
+}
+
+function parseInterpolation(context) {
+  // 一种形式：遇到左大括号，即分隔符好的左符号
+  const [open, close] = context.options.delimiters;
+  advanceBy(context, open.length); // 移除左边分割符号
+  const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
+  const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
+  advanceBy(context, close.length); // 移除右边分隔符号
+
+  return {
+    type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.INTERPOLATION,
+    content: {
+      type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.SIMPLE_EXPRESSION,
+      content,
+      isStatic: false,
+    },
+  };
+}
+
+// <div id="foo" v-if="show">Text {{name}}</div>
+function parseElement(context) {
+  // 解析分为三部分
+  // 1. 开始标签
+  // 2. children
+  // 3. 结束标签
+  // debugger;
+
+  const element = parseTag(context); // 开始标签
+  if (element.isSelfClosing) {
+    // 如果是自闭合的标签，可以返回
+    return element;
+  }
+  // debugger
+  element.children = parseChildren(context); // children
+  parseTag(context); // 结束标签
+  return element;
+}
+
+function parseTag(context) {
+  const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source);
+  // 正则分组改变优先级, match[0]包含<，而match[1]不包含<，只是标签名
+  const tag = match[1]; // 标签名
+  advanceBy(context, match[0].length); // 去除<div
+  advanceSpaces(context); // 去除空格
+
+  /* 属性节点、指令节点 */
+  const { props, directives } = parseAttributes(context);
+
+  // 自闭合形式，但是<br>也是正确的，需要另外一个函数的辅助
+  const isSelfClosing =
+    context.source.startsWith("/>") || context.options.isVoidTag(tag);
+  advanceBy(context, isSelfClosing ? 2 : 1); // 自闭合截取2，非自闭合截取1
+
+  const tagType = isComponent(context, tag)
+    ? _ast__WEBPACK_IMPORTED_MODULE_1__.ElementTypes.COMPONENT
+    : _ast__WEBPACK_IMPORTED_MODULE_1__.ElementTypes.ELEMENT;
+
+  return {
+    type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.ELEMENT,
+    tag, // 标签名,
+    tagType, // 是组件还是原生元素,
+    props, // 属性节点数组,
+    directives, // 指令数组
+    isSelfClosing, // 是否是自闭合标签,
+    children: [],
+  };
+}
+
+function parseAttributes(context) {
+  const props = [];
+  const directives = [];
+
+  function isTagEnd(context) {
+    const s = context.source;
+    return s === "" || s.startsWith(">") || s.startsWith("/>");
+  }
+
+  while (!isTagEnd(context)) {
+    const attr = parseSingleAttribute(context);
+    if (attr.type === _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.DIRECTIVE) {
+      directives.push(attr);
+    } else {
+      props.push(attr);
+    }
+  }
+
+  return { props, directives };
+}
+
+function parseSingleAttribute(context) {
+  const match = /^[^\t\r\n\f />][^\t\r\n\f />=]*/.exec(context.source);
+  // 分为两种匹配，第一个key=value结构，如id="app"，第二个没有key=value结构，如checkd
+  const name = match[0];
+  advanceBy(context, name.length);
+  advanceSpaces(context);
+
+  let value = null;
+  const s = context.source;
+  if (s[0] === "=") {
+    /* 如果是key=value结构 */
+    advanceBy(context, 1); // 去除等号
+    advanceSpaces(context); // 去除多余的空格
+    value = parseAttributeValue(context);
+  }
+
+  // 指令节点，通过name判断，一定是v-, @, :开头
+  if (/^(v-|@|:)/.test(name)) {
+    let dirName = null;
+    let arg = null;
+    // 三种形式
+    if (name[0] === ":") {
+      dirName = "bind";
+      arg = name.slice(1);
+    } else if (name[0] === "@") {
+      dirName = "on";
+      arg = name.slice(1);
+    } else if (name.startsWith("v-")) {
+      [dirName, arg] = name.slice(2).split(":");
+    }
+
+    return {
+      type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.DIRECTIVE,
+      name,
+      exp: value && {
+        //等号之后的内容
+        type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.SIMPLE_EXPRESSION,
+        content: value.content,
+        isStatic: false,
+      },
+      arg: arg && {
+        // 等号之前的内容
+        type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.SIMPLE_EXPRESSION,
+        content: (0,_utils__WEBPACK_IMPORTED_MODULE_0__.camelize)(arg),
+        isStatic: true,
+      },
+    };
+  }
+
+  // 普通的属性节点
+  return {
+    type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.ATTRIBUTE,
+    name,
+    value: value && {
+      type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.TEXT,
+      content: value.content,
+    },
+  };
+}
+
+function parseAttributeValue(context) {
+  // 三种情况：双引号，单引号，没有引号，默认都是带有引号的
+  const quote = context.source[0];
+  advanceBy(context, 1); //去除第一个引号
+  const end = context.source.indexOf(quote);
+  const content = sliceStr(context, end);
+  advanceBy(context, 1); // 去除后一个引号
+  advanceSpaces(context); // 去除空格
+  return { content };
+}
+
+function parseText(context) {
+  const endTags = ["</", context.options.delimiters[0]];
+
+  // 三种结束方式
+  // 1. 遇到插值的分隔符{{
+  // 2. 遇到结束标签</
+  // 3. 一行的末尾
+  let textLen = context.source.length;
+  textLen = endTags.reduce((prev, tag) => {
+    const idx = context.source.indexOf(tag);
+    if (idx !== -1) {
+      prev = Math.min(prev, idx);
+    }
+    return prev;
+  }, textLen);
+
+  const content = sliceStr(context, textLen);
+
+  return {
+    type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.TEXT,
+    content,
+  };
+}
+
+function sliceStr(context, textLen) {
+  const content = context.source.slice(0, textLen);
+  advanceBy(context, textLen);
+  advanceSpaces(context);
+  return content;
+}
+
+function advanceBy(context, numberOfCharacters) {
+  // 指定前进的字符数量，即
+  context.source = context.source.slice(numberOfCharacters);
+}
+function advanceSpaces(context) {
+  // 将下一个非空白字符前的空白字符串去掉
+  const match = /^[\t\r\n\f ]+/.exec(context.source);
+  // 如果匹配到相应的空白字符串
+  if (match) {
+    advanceBy(context, match[0].length); // 第一个就是匹配成功的空白字符串
+  }
+}
+
+function isComponent(context, tag) {
+  return !context.options.isNativeTag(tag);
+}
+
+
+/***/ }),
+
+/***/ "./src/reactivity/computed.js":
+/*!************************************!*\
+  !*** ./src/reactivity/computed.js ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "computed": () => (/* binding */ computed)
+/* harmony export */ });
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _effect__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./effect */ "./src/reactivity/effect.js");
+/* 无论是基本数据还是传入的函数，都是放入一个对象中存储，不同的是为了设计computed的缓存特性增加了lazy与scheduler调用
+    lazy避免第一次运行，通过effect函数保存scheduler，最后在trigger中判断是否有调度器，
+    如果有调度器调用调度器，否则才是调用传入的函数
+
+    通过自身的属性_dirty判断自身的依赖是否更新
+    通过get捕获中的track，捕获依赖自身的那些函数
+    通过调度器调用时，进行触发依赖于自身的函数，注意：computed自身的依赖与依赖自身的变量是两个概念！
+ */
+
+
+
+
+class ComputedImpl {
+  constructor(options) {
+    this._setter = options.setter;
+    this._value = undefined; /* 当前的值 */
+    this._dirty = true; /* 表示computed依赖的变量有更新，不是依赖computed的函数！ */
+    this.effect = (0,_effect__WEBPACK_IMPORTED_MODULE_1__.effect)(options.getter, {
+      lazy: true,
+      scheduler: () => {
+        /* 调度器是为了满足缓存的特性而设计的！trigger只会调用调度器，通过调度器控制_ditry来更新，并且不会直接调用 */
+        if (!this._dirty) {
+          // 如果未更新不需要重新计算
+          this._dirty = true; /* 当scheduler被调用时，表示的变量发生了更新，但是getter不会被调用，而是自身的value被引用即触发get操作时才会判断_dirty并决定是否重新计算 */
+          (0,_effect__WEBPACK_IMPORTED_MODULE_1__.trigger)(
+            this,
+            "value"
+          ); /* 通知依赖自身的函数更新，通过get捕获判断_dirty重新计算，注意和trigger函数中进行区分！ */
+        }
+      },
+    }); /* 修改effect函数，如果传入了lazy初始默认不执行，如果传入了scheduler，则保存在自身上！ */
+  }
+
+  get value() {
+    if (this._dirty) {
+      // 通过判断自身依赖的变量是否发生了更新，从而确定自身是否更新
+      this._dirty = false; // 重新计算后，将_dirty置为false
+      this._value =
+        this.effect(); /* 此时调用的函数是从effect函数中返回的，是getter操作被封装成一个effectFn，最后返回的 */
+      (0,_effect__WEBPACK_IMPORTED_MODULE_1__.track)(this, "value"); /* 第一次默认进行会被收集依赖 */
+    }
+    return this._value;
+  }
+
+  set value(value) {
+    /* 判断是否只读！ */
+    this._setter(value)
+  }
+}
+
+function computed(getterOrOption) {
+  let getter = () => {}
+  let setter = () => {
+    console.error("The computed is readonly！");
+  };
+
+  let options = (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isFunction)(getterOrOption)
+    ? { getter: getterOrOption, setter }
+    : { getter: getterOrOption.getter || getter, setter: getterOrOption.set || setter };
+  
+  return new ComputedImpl(options)
+}
+
+
+/***/ }),
+
 /***/ "./src/reactivity/effect.js":
 /*!**********************************!*\
   !*** ./src/reactivity/effect.js ***!
@@ -104,6 +633,31 @@ function trigger(target, key) {
       effect.scheduler ? effect.scheduler(effect) : effect();
     });
 }
+
+
+/***/ }),
+
+/***/ "./src/reactivity/index.js":
+/*!*********************************!*\
+  !*** ./src/reactivity/index.js ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "computed": () => (/* reexport safe */ _computed__WEBPACK_IMPORTED_MODULE_2__.computed),
+/* harmony export */   "effect": () => (/* reexport safe */ _effect__WEBPACK_IMPORTED_MODULE_3__.effect),
+/* harmony export */   "reactive": () => (/* reexport safe */ _reactive__WEBPACK_IMPORTED_MODULE_0__.reactive),
+/* harmony export */   "ref": () => (/* reexport safe */ _ref__WEBPACK_IMPORTED_MODULE_1__.ref)
+/* harmony export */ });
+/* harmony import */ var _reactive__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactive */ "./src/reactivity/reactive.js");
+/* harmony import */ var _ref__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ref */ "./src/reactivity/ref.js");
+/* harmony import */ var _computed__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./computed */ "./src/reactivity/computed.js");
+/* harmony import */ var _effect__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./effect */ "./src/reactivity/effect.js");
+
+
+
+
 
 
 /***/ }),
@@ -298,19 +852,19 @@ function createApp(root) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "Fragment": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.Fragment),
-/* harmony export */   "ShapeFlags": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.ShapeFlags),
-/* harmony export */   "Text": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.Text),
-/* harmony export */   "createApp": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_3__.createApp),
-/* harmony export */   "h": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_2__.h),
+/* harmony export */   "Fragment": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_3__.Fragment),
+/* harmony export */   "ShapeFlags": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_3__.ShapeFlags),
+/* harmony export */   "Text": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_3__.Text),
+/* harmony export */   "createApp": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_0__.createApp),
+/* harmony export */   "h": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_3__.h),
 /* harmony export */   "mount": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.mount),
-/* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_0__.nextTick),
+/* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_2__.nextTick),
 /* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render)
 /* harmony export */ });
-/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
-/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
-/* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
+/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
 
 
 
@@ -856,37 +1410,69 @@ function normalizeVNode(vnode) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "camelize": () => (/* binding */ camelize),
 /* harmony export */   "hasChanged": () => (/* binding */ hasChanged),
 /* harmony export */   "isArray": () => (/* binding */ isArray),
 /* harmony export */   "isFunction": () => (/* binding */ isFunction),
+/* harmony export */   "isNativeTag": () => (/* binding */ isNativeTag),
 /* harmony export */   "isNumber": () => (/* binding */ isNumber),
 /* harmony export */   "isObject": () => (/* binding */ isObject),
-/* harmony export */   "isString": () => (/* binding */ isString)
+/* harmony export */   "isString": () => (/* binding */ isString),
+/* harmony export */   "isVoidTag": () => (/* binding */ isVoidTag)
 /* harmony export */ });
 function isObject(target) {
-  return typeof target === 'object' && 
-    target !== null 
+  return typeof target === "object" && target !== null;
 }
 
 function isFunction(getter) {
-  return typeof getter === 'function'
+  return typeof getter === "function";
 }
 
 function isArray(target) {
-  return Array.isArray(target)
+  return Array.isArray(target);
 }
 
 function isString(target) {
-  return typeof target === 'string'
+  return typeof target === "string";
 }
 
 function isNumber(target) {
-  return typeof target === 'number'
+  return typeof target === "number";
 }
 
 function hasChanged(origin, current) {
-  return origin !== current && (!Number.isNaN(origin) && !Number.isNaN(current))
+  return origin !== current && !Number.isNaN(origin) && !Number.isNaN(current);
 }
+
+function camelize(str) {
+  return str.replace(/-(\w)/g, (_, c) => (c ? c.toUpperCase() : " "));
+}
+
+const HTML_TAGS =
+  "html,body,base,head,link,meta,style,title,address,article,aside,footer," +
+  "header,h1,h2,h3,h4,h5,h6,hgroup,nav,section,div,dd,dl,dt,figcaption," +
+  "figure,picture,hr,img,li,main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,code," +
+  "data,dfn,em,i,kbd,mark,q,rp,rt,rtc,ruby,s,samp,small,span,strong,sub,sup," +
+  "time,u,var,wbr,area,audio,map,track,video,embed,object,param,source," +
+  "canvas,script,noscript,del,ins,caption,col,colgroup,table,thead,tbody,td," +
+  "th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup," +
+  "option,output,progress,select,textarea,details,dialog,menu," +
+  "summary,template,blockquote,iframe,tfoot";
+
+const VOID_TAGS =
+  "area,base,br,col,embed,hr,img,input,link,meta,param,source,track,wbr";
+
+function makeMap(str) {
+  const map = str
+    .split(",")
+    // 逗号运算符会返回后一个的表达式，如(,map)返回map，(1,2,3,alert)("世界你好")可以成功调用alert！
+    .reduce((map, item) => ((map[item] = true), map), Object.create(null));
+  return (val) => !!map[val];
+}
+
+const isVoidTag = makeMap(VOID_TAGS);
+const isNativeTag = makeMap(HTML_TAGS);
+
 
 /***/ })
 
@@ -953,151 +1539,29 @@ var __webpack_exports__ = {};
   !*** ./src/index.js ***!
   \**********************/
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _reactivity_ref__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reactivity/ref */ "./src/reactivity/ref.js");
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "MiniVue": () => (/* binding */ MiniVue)
+/* harmony export */ });
+/* harmony import */ var _compiler_compile_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./compiler/compile.js */ "./src/compiler/compile.js");
 /* harmony import */ var _runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./runtime */ "./src/runtime/index.js");
+/* harmony import */ var _reactivity__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./reactivity */ "./src/reactivity/index.js");
 
 
 
 
-// const vnode = h(
-//   "div",
-//   {
-//     class: "a b",
-//     style: {
-//       border: "1px solid black",
-//       "font-size": "14px",
-//     },
-//     onClick: () => console.log("click"),
-//     id: "vnode",
-//     checked: "",
-//     custom: false,
-//   },
-//   [
-//     h("ul", null, [
-//       h("li", { style: { color: "red" } }, 1),
-//       h("li", null, 2),
-//       h("li", { style: { 'background-color': "blue" } }, 3),
-//       h(Fragment, null, [h("li", null, 4), h("li", null, 5)]),
-//       h("li", null, [h(Text, null, "Hello World")]),
-//     ]),
-//   ]
-// );
-
-// render(
-//   h("ul", null, [
-//     h("li", { style: { color: "red" } }, 1),
-//     h("li", null, 2),
-//     h("li", { style: { "background-color": "blue" } }, 3),
-//     h(Fragment, null, []),
-//     h("li", null, [h(Text, null, "Hello World")]),
-//   ]),
-//   document.body
-// );
-
-// setTimeout(() => {
-//   render(
-//     h("ul", null, [
-//       /* 1，2，3都不重新创建dom元素，3修改属性 */
-//       h("li", { style: { color: "red" } }, 1),
-//       h("li", null, 2),
-//       h("li", { style: { "background-color": "red" } }, 3),
-//       /* 由于新增了元素，所以会被创建并添加，注意ul的子元素长度是一样的，Fragment只会和Fragment对比，不会和Hello World最后一个li对比 */
-//       h(Fragment, null, [h("li", null, 4), h("li", null, 5)]),
-//       /* 不会重新创建元素，只会修改内容，所以造成的结果就是在原有的位置修改元素，而添加的4，5就在后面，因为这个你好世界所在的元素并未修改位置，只是修改内部的内容 */
-//       // 这种Fragment情况可以通过 anchor定位锚 + insertBefore API来解决，思想就是在插入之前确定位置
-//       h("li", null, [h(Text, null, "你好 世界")]),
-//     ]),
-//     document.body
-//   );
-// }, 2000);
-
-// const Comp = {
-//   props: ["foo"],
-//   render(ctx) {
-//     return h("div", { class: "a", id: ctx.bar }, ctx.foo);
-//   },
-// };
-
-// const props = {
-//   foo: "foo",
-//   bar: "bar",
-// };
-
-// const vnode = h(Comp, props);
-
-// render(vnode, document.body);
-
-// const Comp = {
-//   setup() {
-//     const count = ref(0);
-
-//     const add = () => {
-//       count.value += 3;
-//     };
-//     const sub = () => {
-//       count.value -= 3;
-//     };
-//     const dateTime = ref(new Date().toLocaleString());
-//     // setInterval(() => {
-//     //   dateTime.value = new Date().toLocaleString()
-//     // }, 1000);
-//     console.log("setup执行");
-
-//     return {
-//       count,
-//       add,
-//       sub,
-//       dateTime,
-//     };
-//   },
-//   render(ctx) {
-//     console.log("render执行");
-//     return [
-//       h("div", null, `counter: ${ctx.count.value}`) /* 并没有处理去掉value */,
-//       h("button", { onClick: ctx.sub }, "-"),
-//       h("button", { onClick: ctx.add }, "+"),
-//       h("div", null, `DateTime：${ctx.dateTime.value}`),
-//     ];
-//   },
-// };
-// const vnode = h(Comp, null);
-// render(vnode, document.body);
-
-
-
-(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.createApp)({
-  setup() {
-    const count = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)(0);
-
-    const add = () => {
-      count.value += 3;
-    };
-    const sub = () => {
-      count.value -= 3;
-    };
-    const dateTime = (0,_reactivity_ref__WEBPACK_IMPORTED_MODULE_0__.ref)(new Date().toLocaleString());
-    // setInterval(() => {
-    //   dateTime.value = new Date().toLocaleString()
-    // }, 1000);
-    console.log("setup执行");
-
-    return {
-      count,
-      add,
-      sub,
-      dateTime,
-    };
-  },
-  render(ctx) {
-    console.log("render执行");
-    return [
-      (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("div", null, `counter: ${ctx.count.value}`) /* 并没有处理去掉value */,
-      (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("button", { onClick: ctx.sub }, "-"),
-      (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("button", { onClick: ctx.add }, "+"),
-      (0,_runtime__WEBPACK_IMPORTED_MODULE_1__.h)("div", null, `DateTime：${ctx.dateTime.value}`),
-    ];
-  },
-}).mount(document.body)
+const MiniVue = (window.MiniVue = {
+  createApp: _runtime__WEBPACK_IMPORTED_MODULE_1__.createApp,
+  render: _runtime__WEBPACK_IMPORTED_MODULE_1__.render,
+  h: _runtime__WEBPACK_IMPORTED_MODULE_1__.h,
+  Text: _runtime__WEBPACK_IMPORTED_MODULE_1__.Text,
+  Fragment: _runtime__WEBPACK_IMPORTED_MODULE_1__.Fragment,
+  nextTick: _runtime__WEBPACK_IMPORTED_MODULE_1__.nextTick,
+  reactive: _reactivity__WEBPACK_IMPORTED_MODULE_2__.reactive,
+  ref: _reactivity__WEBPACK_IMPORTED_MODULE_2__.ref,
+  computed: _reactivity__WEBPACK_IMPORTED_MODULE_2__.computed,
+  effect: _reactivity__WEBPACK_IMPORTED_MODULE_2__.effect,
+  compile: _compiler_compile_js__WEBPACK_IMPORTED_MODULE_0__.compile
+});
 
 })();
 
