@@ -17,7 +17,11 @@ function traverseNode(node) {
     case NodeTypes.ROOT:
       return traverseChildren(node);
     case NodeTypes.ELEMENT:
-      return createElementVNode(node);
+      // 指令节点都在元素节点中，所以处理元素节点的同时也是处理指令节点，
+      // 并且对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
+      // runtime中的helper，对于v-for为renderList
+      return resolveElementVNode(node);
+    // return createElementVNode(node);
     case NodeTypes.INTERPOLATION:
       return createInterpolationVNode(node);
     case NodeTypes.TEXT:
@@ -41,12 +45,39 @@ function createInterpolationVNode(node) {
   return `h(Text, null, ${createText(node.content)})`;
 }
 
+function resolveElementVNode(node) {
+  const { tag, directives } = node;
+  // debugger;
+  // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
+  const forNode = pluck(directives, "for");
+  if (forNode) {
+    // 如果存在v-for指令节点
+    // <div v-for="(item, index) in items">{{item + index}}</div>
+    // 编译目标
+    // h(
+    //   Fragment,
+    //   null,
+    //   renderList(items, (item, index) => h('div', null, item + index))
+    // );
+
+    const props = formatProps(node);
+
+    const [args, sources] = forNode.exp.content.split(/\sin\s|\sof\s/); // in of 相同
+    return `h(
+      Fragment, 
+      null, 
+      renderList(
+        ${sources}, 
+        ${args} => h('${tag}', ${props}, ${traverseChildren(node)}))
+      )`;
+  }
+  return createElementVNode(node);
+}
+
 function createElementVNode(node) {
   const tag = createText({ content: node.tag }); //创建文本
 
-  /* 解析属性节点和指令节点 */
-  const propArr = createPropArr(node);
-  const props = propArr?.length ? `{${propArr.join(", ")}}` : "null";
+  const props = formatProps(node);
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
   const children = traverseChildren(node);
@@ -63,7 +94,7 @@ function createElementVNode(node) {
 function createPropArr(node) {
   const { props, directives } = node;
   return [
-    ...props.map((prop) => `${props.name}: ${createText(prop.value)}`),
+    ...props.map((prop) => `${prop.name}: ${createText(prop.value)}`),
     ...directives.map((dir) => {
       /* 从ast中抽出dirname */
       switch (dir.name) {
@@ -76,9 +107,13 @@ function createPropArr(node) {
 
           let exp = dir.exp.content;
 
-          /* 简单判断是否以括号结尾，并且不包含 => 即不是一个箭头函数 */
-          if (/\([^)]*?\)$/.test(exp) && !exp.includes('=>')) {
-            exp = `$event => {${exp}}`
+          /* 不包含 => 即不是一个箭头函数 */
+          if (
+            (/\([^)]*?\)$/.test(exp) || // 带有括号形式
+              /\+\+|--|\+=|-=|\*=|\/=|\%=|==|===/.test(exp)) && // ++ -- 形式
+            !exp.includes("=>") // 不是箭头函数
+          ) {
+            exp = `$event => {${exp}}`;
           }
 
           return `${event}: ${exp}`;
@@ -89,6 +124,12 @@ function createPropArr(node) {
       }
     }),
   ];
+}
+
+function formatProps(node) {
+  /* 解析属性节点和指令节点，生成对应的字符串格式 */
+  const propArr = createPropArr(node);
+  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 function traverseChildren(node) {
@@ -103,4 +144,19 @@ function traverseChildren(node) {
       .join(", ") +
     "]"
   );
+}
+
+/**
+ * 表示接受一个指令集合、指令名称、是否移除指令
+ * @param {*} directives
+ * @param {*} name
+ * @param {Boolean} remove:true
+ */
+function pluck(directives = [], name, remove = true) {
+  const idx = directives.findIndex((dir) => dir.name === name); // 找对应名字的指令
+  const dir = directives[idx];
+  if (dir && remove) {
+    directives.splice(idx, 1); // 如果存在，并且需要删除，则删除对应的指令节点
+  }
+  return dir;
 }
