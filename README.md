@@ -69,3 +69,19 @@ function flushJobs() {
   }
 }
 ```
+
+### 踩坑记录
+
+- 不同类型的组件，卸载旧组件后挂载新组件，而不是继续patch！因为与别人的流程不一致，需要自己想清楚流程规划。
+
+```js
+  if (!isSameVNodeType(_vnode, vnode)) {
+    // 类型不同，卸载旧vnode，需要更新锚位置，即新vnode插入的位置
+    // anchor = _vnode.anchor || _vnode.el.nextSibling;
+    anchor = _vnode.el.nextSibling || _vnode.anchor;
+    unmount(_vnode);
+    mount(vnode, container, anchor);
+    _vnode = null; // 不放在unmount中，vnode可能还会复用，但类型不同肯定不复用
+    return;
+  }
+```

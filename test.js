@@ -84,6 +84,7 @@ obj = {
   name: "lisi",
   age: 18,
   height: 1.9,
+  if: "hello"
 };
 const { age } = obj;
 console.log(age);

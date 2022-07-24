@@ -100,31 +100,40 @@ function createInterpolationVNode(node) {
 }
 
 function resolveElementVNode(node) {
-  const { tag, directives } = node;
+  const { directives } = node;
+  const tag = createText({ content: node.tag }); // tag应该为字符串
+
   // debugger;
   // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
   const forNode = pluck(directives, "for");
   if (forNode) {
-    // 如果存在v-for指令节点
-    // <div v-for="(item, index) in items">{{item + index}}</div>
     // 编译目标
+    // <div v-for="(item, index) in items">{{item + index}}</div>
     // h(
     //   Fragment,
     //   null,
     //   renderList(items, (item, index) => h('div', null, item + index))
     // );
-
-    const props = formatProps(node);
-
     const [args, sources] = forNode.exp.content.split(/\sin\s|\sof\s/); // in of 相同
     return `h(
       Fragment, 
       null, 
       renderList(
-        ${sources}, 
-        ${args} => h('${tag}', ${props}, ${traverseChildren(node)}))
+        ${sources.trim()}, ${args.trim()} => ${resolveElementVNode(node)})
       )`;
   }
+
+  const ifNode = pluck(directives, "if");
+  if (ifNode) {
+    // 编译目标
+    // <div v-if="ok"></div>
+    // ok ? h('div') : h(Text, null, ''); 空文本节点
+    const condition = ifNode.exp.content;
+    return `${condition} 
+      ? ${resolveElementVNode(node)} 
+      : h(Text, null, '')`;
+  }
+
   return createElementVNode(node);
 }
 
@@ -174,16 +183,11 @@ function createPropArr(node) {
         case "html":
           return `innerHTML: ${createText(dir.exp)}`;
         default:
-          break;
+          return `${dir.arg?.content || dir.name}: ${createText(dir.exp)}`;
+        // return dir; // 没有处理的不能原样返回
       }
     }),
   ];
-}
-
-function formatProps(node) {
-  /* 解析属性节点和指令节点，生成对应的字符串格式 */
-  const propArr = createPropArr(node);
-  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 function traverseChildren(node) {
@@ -198,6 +202,13 @@ function traverseChildren(node) {
       .join(", ") +
     "]"
   );
+}
+
+function formatProps(node) {
+  // 每一个不同的指令节点，不能共用，因为pluck会删除元素
+  /* 解析属性节点和指令节点，生成对应的字符串格式 */
+  const propArr = createPropArr(node);
+  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 /**
@@ -288,7 +299,6 @@ function parse(content) {
   /* 保存原有字符串，并加上一些配置信息 */
   const context = createParseContext(content);
   /* 通过context及配置信息，编译children的ast */
-  // debugger
   const children = parseChildren(context);
   /* 生成编译后带有根节点的初始抽象语法树 */
   return (0,_ast__WEBPACK_IMPORTED_MODULE_1__.createRoot)(children);
@@ -834,7 +844,7 @@ function reactive(target) {
 
   /* 特殊情况二：多个依赖依赖于同一个对象，只生成一个代理对象，使用一个WeakMap来存储每一个代理对象 */
   if (proxyMap.has(target)) {
-    return reactive.get(target);
+    return proxyMap.get(target);
   }
 
   /* 如果是一个对象，那么就返回一个代理对象 */
@@ -1022,14 +1032,15 @@ __webpack_require__.r(__webpack_exports__);
 function renderList(sources, renderItem) {
   // v-for可能存在的形式
   // Array，Object，String，Number
+  let nodes = [];
   if (
     (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(sources) ||
     ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(sources) && (sources = sources.split("")))
   ) {
+    // debugger
     return sources.map((source, index) => renderItem(source, index));
   }
 
-  let nodes = [];
   if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isNumber)(sources)) {
     // const arr = Array.from({ length: sources }, (v, i) => i + 1);
     for (let i = 0; i < sources; i++) {
@@ -1093,12 +1104,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "render": () => (/* binding */ render),
 /* harmony export */   "unmount": () => (/* binding */ unmount)
 /* harmony export */ });
-/* harmony import */ var _reactivity_reactive__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reactivity/reactive */ "./src/reactivity/reactive.js");
+/* harmony import */ var _reactivity__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reactivity */ "./src/reactivity/index.js");
 /* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
-/* harmony import */ var _reactivity_effect__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../reactivity/effect */ "./src/reactivity/effect.js");
-/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
-/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../compiler */ "./src/compiler/index.js");
+/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../compiler */ "./src/compiler/index.js");
 
 
 
@@ -1107,25 +1117,22 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /**
- * render 渲染VNode，虚拟DOM很多种类型，相应的挂载到真实DOM上也是很多方式，也就是很多种类型的unmount/patch函数
+ * 渲染VNode，每种vnode对应不同的mount/unmount/patch函数
+ * 真实DOM只存在两种节点，标签和文本(包括注释)
+ * createElement | createTextNode 两种方式
+ * type关注自身，shapeFlag关注自身与children，方便运算
  * @param {*} vnode
  * @param {HTML Element} container
  */
 function render(vnode, container) {
-  // 将虚拟DOM挂载到真实的DOM元素上，方便保留以进行与新VNode的diff对比！
-  // 新vnode代表旧vnode的最新状态
-  // vnode为当前新生成的vnode，_vnode是原有的vnode，进行diff比对无论如何都要生成vnode，优化在于通过比对决定是否操作是否操作真实DOM
-  // 如果新的vnode被生成了即代表没有被卸载，就需要进行patch进行更新，否则如果新vnode不存在就代表要将对应的旧vnode卸载，
-  // 因为代表旧vnode的最新状态的新vnode已经不存在了！
-
-  const { _vnode } = container; /* 取出就vnode */
+  // _vnode即旧vnode，将_vnode放在对应真实DOM上，方便进行与新VNode的diff对比
+  const { _vnode } = container;
   if (!vnode) {
-    /* 如果新vnode已经不存在，卸载旧vnode */
-    unmount(_vnode);
+    unmount(_vnode); // 新vnode不存在，卸载旧vnode，后续流程均存在vnode
   } else {
-    /* 如果新vnode存在，那么就进行diff比对，即patch俗称打补丁 */
-    patch(_vnode, vnode, container);
+    patch(_vnode, vnode, container); // 更新
   }
+  container._vnode = vnode; // 代表旧vnode
 }
 
 function mount(vnode, container, anchor) {
@@ -1137,17 +1144,14 @@ function mount(vnode, container, anchor) {
   } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.FRAGMENT) {
     mountFragment(vnode, container, anchor);
   } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.COMPONENT) {
-    mountComponent(vnode, container, anchor);
+    patchComponent(null, vnode, container, anchor);
   }
-  container._vnode =
-    vnode; /* 注意：并不是所有的的真实DOM都存有虚拟dom，但是每一个虚拟dom都存有其真实dom的引用 */
 }
 
 function unmount(vnode) {
   const { shapeFlag } = vnode;
   if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ELEMENT || shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT) {
-    /* 普通的element和text节点通过移除children实现 */
-    // unmountChildren(vnode);
+    /* 所有真实DOM的移除：Element和Text节点通过移除children实现 */
     const { el } = vnode;
     el.parentNode.removeChild(el);
   } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.FRAGMENT) {
@@ -1159,18 +1163,21 @@ function unmount(vnode) {
 
 function patch(_vnode, vnode, container, anchor) {
   if (!_vnode) {
-    /* 如果旧vnode不存在，代表此时是一个挂载mount的过程！ */
+    // 挂载
     mount(vnode, container, anchor);
     return;
   }
+
   if (!isSameVNodeType(_vnode, vnode)) {
-    /* 如果旧vnode存在，但是和新产生的vnode不一样，卸载旧vnode，挂载新vnode */
-    /* 如果不是相同的节点，设置下一个节点为anchor，即在下一个节点前进行插入才是正确的，
-    但是对于Fragment多设置了一个endAnchor */
-    anchor = (_vnode.anchor || _vnode.el).nextSibling();
+    // 类型不同，卸载旧vnode，需要更新锚位置，即新vnode插入的位置
+    // anchor = _vnode.anchor || _vnode.el.nextSibling; 错误
+    anchor = _vnode.el.nextSibling || _vnode.anchor;
     unmount(_vnode);
-    _vnode = null;
+    mount(vnode, container, anchor);
+    _vnode = null; // 不放在unmount中，vnode可能还会复用，但类型不同肯定不复用
+    return;
   }
+
   /* 同类型vnode，shapeFlag相同 */
   const { shapeFlag } = vnode;
   if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ELEMENT) {
@@ -1185,7 +1192,6 @@ function patch(_vnode, vnode, container, anchor) {
 }
 
 function isSameVNodeType(_vnode, vnode) {
-  /* 同一种节点与同一类型的节点是不一样的 */
   return _vnode.type === vnode.type;
 }
 
@@ -1195,14 +1201,14 @@ function mountElement(vnode, container, anchor) {
   patchProps(null, props, el); /* 用patch改造mount */
 
   if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
-    mountText(vnode, el); /* 注意层级关系 */
+    mountText(vnode, el);
   } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
     mountChildren(vnode.children, el);
   }
-  // container.appendChild(el); /* 添加子元素 */
-  // 使用insertBefore指定位置添加元素
+
   container.insertBefore(el, anchor);
-  vnode.el = el; /* 为了在更新时拿到对应的真实dom节点，保存真实dom地址 */
+  vnode.el = el; /* 为了在更新时拿到对应的真实dom */
+  vnode.anchor = anchor;
 }
 
 function mountText(vnode, container, anchor) {
@@ -1215,35 +1221,73 @@ function mountText(vnode, container, anchor) {
 
 function mountFragment(vnode, container, anchor) {
   /* 将当前的Fragment子元素挂载到Fragment父元素上*/
-  // 思想：在Fragment子元素数组中，创建开始和结束两个空节点作为锚定位，初始时vnode的el、anchor为null，
-  // 此时将el赋值为一个空节点，后续会被修改为对应的真实dom节点。el的初始设定不会影响，但是endAnchor就可以起到定位
-  // 因为每一次更新或者挂载时，都会将前一个el作为后一个el，后一个被挂载时生成新的取代原有的el属性，
-  // 而最后一个anchor每次都会被传递，所以可以认为每一个子元素的anchor都是一样的，就是最后一个空节点
-  // 之所以是最后一个，因为每次使用的API都是insertBefore
+
+  // 思想：在初始Fragment子元素数组中，创建开始和结束两个空文本节点作为锚定位【"", ..., ""】
 
   const startAnchor = document.createTextNode("");
   const endAnchor = document.createTextNode("");
   vnode.el = startAnchor;
   vnode.anchor = endAnchor;
-  /* 初始Fragment首先添加两个空节点作为锚，然后将endAnchor作为参数一致传递下去，
-  只要有appEndChild都需要替换为insertBefor，并且insertBefore的参数就是anchor
-  传递下去，最终会传递到本身，使用即可，此时的anchor为undefined，可以使用appendChild也可以使用insertBefore
-  insertBefore的anchor参数未指定，则默认在最后插入，和appendChild的功能一致
-   */
 
-  container.appendChild(startAnchor);
-  container.appendChild(endAnchor);
-  // container.insertBefore(startAnchor, anchor)
-  // container.insertBefore(endAnchor, anchor)
+  // 使用的是insertBefore函数，endAnchor可以起到定位作用
+  // anchor参数未指定或为undefined，默认在最后插入，和appendChild的功能一致
+  // container.appendChild(startAnchor);
+  // container.appendChild(endAnchor);
+  container.insertBefore(startAnchor, anchor);
+  container.insertBefore(endAnchor, anchor);
 
+  // 将endAnchor作为参数一致传递下去，最终会传递到自身，使用即可
   mountChildren(vnode.children, container, endAnchor);
 }
 
-function mountComponent(vnode, container, anchor) {
-  // 组件是一个对象，由两个阶段生成，vue3的组件和react的类式组件非常类似，都具有render函数，通过render产出vnode
-  // 第一阶段是原生的不经过h函数包裹的对象，此时是组件对象如 {props:[], render() {return h('div', null, "我是小明")}}
-  // 第二阶段是经过h函数包裹的对象，此时是vnode对象 如 h(Comp, vnodeProps);
-  // 对于vnode的props属性，有两种情况：第一是内部使用的props父传子，第二是组件本身的attrs标签属性，两者不同
+function mountChildren(children, container, anchor) {
+  children.forEach((child) => mount(child, container, anchor));
+}
+
+function unmountFragment(vnode) {
+  // 添加了anchor后，还需要删除刚开始添加的两个子元素，不能直接调用unmountChildren
+  let { el: curr, anchor } = vnode;
+  const parent = el.parentNode;
+  while (curr !== anchor) {
+    /* anchor是最后一个节点 */
+    let next = curr.nextSibling;
+    parent.removeChild(curr);
+    curr = next;
+  }
+  parent.removeChild(anchor);
+}
+function unmountComponent(vnode) {}
+
+function unmountChildren(children) {
+  children.forEach((child) => unmount(child));
+}
+
+function patchElement(_vnode, vnode, container) {
+  vnode.el = _vnode.el;
+  patchProps(_vnode.props, vnode.props, vnode.el);
+  patchChildren(_vnode, vnode, vnode.el);
+}
+
+function patchText(_vnode, vnode, container, anchor) {
+  container.textContent = vnode.children; /* 更新真实dom的内容 */
+  vnode.el = _vnode.el;
+  vnode.anchor = _vnode.anchor;
+}
+
+function patchFragment(_vnode, vnode, container) {
+  // anchor传递给新vnode
+  const startAnchor = (vnode.el = _vnode.el);
+  const endAnchor = (vnode.anchor = _vnode.anchor);
+  patchChildren(_vnode, vnode, container, endAnchor);
+}
+
+function patchComponent(_vnode, vnode, container, anchor) {
+  // 组件由两个阶段生成
+  // 第一阶段是原生的不经过h函数包裹的组件对象 如 {setup(){}, render() {return h('div', null, "我是小明")}}
+  // 第二阶段是经过h函数包裹的vnode对象，如 h(Comp, vnodeProps);
+
+  // vnode的props属性有两种：1. 内部使用的props父传子，2.组件attrs标签属性
+  // 组件对象：Component，虚拟DOM：vnode
 
   const { type: Component, props: vnodeProps } = vnode; /* 获取组件对象 */
 
@@ -1257,7 +1301,7 @@ function mountComponent(vnode, container, anchor) {
     subTree: null,
     patch: null,
   };
-  // initProps() 区分不同的属性
+  // 区分不同的属性
   instance.props ||= {};
   instance.attrs ||= {};
   for (const key in vnodeProps) {
@@ -1267,7 +1311,7 @@ function mountComponent(vnode, container, anchor) {
       instance.attrs[key] = vnodeProps[key];
     }
   }
-  instance.props = (0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_0__.reactive)(instance.props); /* 做响应式处理 */
+  instance.props = (0,_reactivity__WEBPACK_IMPORTED_MODULE_0__.reactive)(instance.props); /* 做响应式处理 */
 
   // 对于vue3，执行setup函数，获取返回值setupState，通过effect确定响应数据，最终通过render产出vnode，render接收ctx
   instance.setupState = Component.setup?.(instance.props, {
@@ -1283,14 +1327,14 @@ function mountComponent(vnode, container, anchor) {
     let { template } = Component;
 
     if (template[0] === "#") {
-      /* 如果是一个#开头的挂载 如#template，而不是直接写模板 */
+      /* 如果是一个#开头的mount 如#template */
       const el = document.querySelector(template);
       template = el ? el.innerHTML : "";
       // 删除原template节点
       el.parentNode.removeChild(el);
     }
 
-    const code = (0,_compiler__WEBPACK_IMPORTED_MODULE_5__.compile)(template);
+    const code = (0,_compiler__WEBPACK_IMPORTED_MODULE_4__.compile)(template);
     // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
     Component.render = new Function(
       "ctx",
@@ -1315,74 +1359,31 @@ function mountComponent(vnode, container, anchor) {
     );
   }
 
+  // console.log("组件的render：", Component.render);
+
   // 执行render函数
   instance.patch = () => {
     const preTree = instance.subTree;
-    /* 生成vnode，并保存在自身的subTree中，作为原有的subTree */
+    /* 生成vnode，作为旧subTree保存在自身的subTree属性 */
     const subTree = (instance.subTree = (0,_vnode__WEBPACK_IMPORTED_MODULE_1__.normalizeVNode)(
       Component.render(instance.ctx)
     ));
+
     vnode.el = subTree.el = preTree ? preTree.el : null;
-    /* 根据vue文档，当返回单个根节点时，非instance.props的vnodeProps，将自动添加到根节点的attribute中，即将instance.attrs添加到根节点的attributes中 */
+    // 根据vue文档，当返回单根节点时，将instance.attrs添加到根节点的attributes中，称为继承
     subTree.props = {
       ...(subTree.props || {}),
       ...(instance.attrs || {}),
     };
-    /* 并不会造成递归调用形式，因为render函数生成vnode不再是comp了 */
+    // debugger;
+    /* 并不会造成递归，因为render函数生成vnode不再是Comp对象，生成的是div等vnode */
     patch(preTree, subTree, container, anchor);
   };
-  /* 通过effect默认执行代表mount，当相应的变量发生改变时也会重新执行 */
-  (0,_reactivity_effect__WEBPACK_IMPORTED_MODULE_3__.effect)(instance.patch, {
-    scheduler:
-      _scheduler__WEBPACK_IMPORTED_MODULE_4__.scheduler /* 如果有scheduler，那么trigger会优先执行scheduler，并将传入的fn，传入到scheduler中 */,
+  /* 通过effect默认执行代表mount，当变量发生改变时也会重新执行 */
+  (0,_reactivity__WEBPACK_IMPORTED_MODULE_0__.effect)(instance.patch, {
+    scheduler: _scheduler__WEBPACK_IMPORTED_MODULE_3__.scheduler, //trigger优先执行scheduler，并将传入的fn传入scheduler函数,
   });
 }
-
-function mountChildren(children, container, anchor) {
-  children.forEach((child) => mount(child, container, anchor));
-}
-
-// function unmountElement(vnode) {}
-// function unmountText(vnode) {}
-
-function unmountFragment(vnode) {
-  // 添加了anchor后，还需要删除刚开始添加的两个子元素，不能直接调用unmountChildren
-  let { el: curr, anchor } = vnode;
-  const parent = el.parentNode;
-  while (curr !== anchor) {
-    /* anchor是最后一个节点 */
-    let next = curr.nextSibling();
-    parent.removeChild(curr);
-    curr = next;
-  }
-  parent.removeChild(anchor);
-}
-function unmountComponent(vnode) {}
-
-function unmountChildren(children) {
-  children.forEach((child) => unmount(child));
-}
-
-function patchElement(_vnode, vnode, container) {
-  /* 不再需要检查_vnode是否存在 */
-  vnode.el = _vnode.el;
-  patchProps(_vnode.props, vnode.props, vnode.el);
-  patchChildren(_vnode, vnode, vnode.el);
-}
-
-function patchText(_vnode, vnode) {
-  _vnode.el.textContent = vnode.children; /* 更新真实dom的内容 */
-  vnode.el = _vnode.el;
-}
-
-function patchFragment(_vnode, vnode, container) {
-  /* anchor传递给下一个节点 */
-  const startAnchor = (vnode.el = _vnode.el);
-  const endAnchor = (vnode.anchor = _vnode.anchor);
-  patchChildren(_vnode, vnode, container, endAnchor);
-}
-
-function patchComponent(_vnode, vnode, anchor) {}
 
 function patchChildren(_vnode, vnode, container, anchor) {
   /* 更新children函数 */
@@ -1392,7 +1393,7 @@ function patchChildren(_vnode, vnode, container, anchor) {
   if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
     // 如果新vnode是TEXT_CHILDREN类型
     if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
-      // container.textContent = children; /* 虚拟DOM应该保持在children中，后续检查以辨别是否与父元素的虚拟dom保持一致，验证正确，并不是vnode.textContent，而是children */
+      // container.textContent = children;
     } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
       unmountChildren(_children); /* 卸载旧组件！ */
       // container.textContent = children;
@@ -1428,6 +1429,7 @@ function patchChildren(_vnode, vnode, container, anchor) {
 function patchArrayChildren(_children, children, container, anchor) {
   const [_len, len] = [_children.length, children.length];
   const baseLen = Math.min(_len, len);
+  // debugger;
   for (let i = 0; i < baseLen; i++) {
     /* 更新元素 */
     patch(_children[i], children[i], container, anchor);
@@ -1604,8 +1606,10 @@ function h(type, props, children) {
       break;
     case "string":
       shapeFlag |= ShapeFlags.ELEMENT; /* 普通元素标签 */
+      break;
     case "symbol" /* 符号类型要么是TEXT要么是FRAGMENT */:
       shapeFlag |= type === Text ? ShapeFlags.TEXT : ShapeFlags.FRAGMENT;
+      break;
   }
   switch (typeof children /* 判断自身 */) {
     case "object":
@@ -1632,22 +1636,23 @@ function h(type, props, children) {
     props,
     children,
     shapeFlag,
-    el: null, /* 代表当前虚拟dom对应的真实dom */
-    anchor: null, /* 锚用于定位 */
+    el: null /* 代表当前虚拟dom对应的真实dom */,
+    anchor: null /* 锚用于定位 */,
   };
 }
 
 function normalizeVNode(vnode) {
   if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(vnode)) {
-    return h(Fragment, null, vnode)
+    return h(Fragment, null, vnode);
   }
   if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isObject)(vnode)) {
-    return vnode
+    return vnode;
   }
   if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(vnode) || (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isNumber)(vnode)) {
-    return h(Text, null, vnode.toString())
+    return h(Text, null, vnode.toString());
   }
 }
+
 
 /***/ }),
 
