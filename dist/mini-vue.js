@@ -1032,7 +1032,6 @@ __webpack_require__.r(__webpack_exports__);
 function renderList(sources, renderItem) {
   // v-for可能存在的形式
   // Array，Object，String，Number
-  let nodes = [];
   if (
     (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(sources) ||
     ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(sources) && (sources = sources.split("")))
@@ -1042,6 +1041,7 @@ function renderList(sources, renderItem) {
   }
 
   if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isNumber)(sources)) {
+    let nodes = [];
     // const arr = Array.from({ length: sources }, (v, i) => i + 1);
     for (let i = 0; i < sources; i++) {
       nodes.push(renderItem(i + 1, i));
