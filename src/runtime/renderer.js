@@ -130,10 +130,10 @@ function mountFragment(vnode, container, anchor) {
   insertBefore的anchor参数未指定，则默认在最后插入，和appendChild的功能一致
    */
 
-  container.appendChild(startAnchor);
-  container.appendChild(endAnchor);
-  // container.insertBefore(startAnchor, anchor)
-  // container.insertBefore(endAnchor, anchor)
+  // container.appendChild(startAnchor);
+  // container.appendChild(endAnchor);
+  container.insertBefore(startAnchor, anchor)
+  container.insertBefore(endAnchor, anchor)
 
   mountChildren(vnode.children, container, endAnchor);
 }
@@ -214,6 +214,8 @@ function mountComponent(vnode, container, anchor) {
     );
   }
 
+  console.log("render函数：",Component.render)
+
   // 执行render函数
   instance.patch = () => {
     const preTree = instance.subTree;
@@ -231,6 +233,7 @@ function mountComponent(vnode, container, anchor) {
     patch(preTree, subTree, container, anchor);
   };
   /* 通过effect默认执行代表mount，当相应的变量发生改变时也会重新执行 */
+  debugger
   effect(instance.patch, {
     scheduler:
       scheduler /* 如果有scheduler，那么trigger会优先执行scheduler，并将传入的fn，传入到scheduler中 */,
