@@ -10,17 +10,15 @@
 
   <body>
     <div id="app">
-      <div type="text/template" id="template">
-        <div>Counter：{{counter.value}}</div>
-        <button @click="sub">-</button>
-        <button @click="add">+</button>
-      </div>
+      <div>Counter：{{counter.value}}</div>
+      <button @click="sub">-</button>
+      <button @click="add">+</button>
     </div>
     <script>
       const { createApp, ref, reactive } = MiniVue;
 
       createApp({
-        template: "#template",
+        // template: "#template",
         // template写法
         // template: `<div>
         //   <div>Counter：{{counter.value}}</div>

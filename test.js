@@ -70,3 +70,5 @@ console.log([1, 2, 3, 4][(1, 2)]);
 console.log([].map(child => "<>").join(','), "===")
 
 console.log(/(\+\+|--|\+=|-=|\*=|\/=)?[\t ]*?$/.test('() i++ \n\n'))
+
+console.log({} instanceof HTMLElement)
