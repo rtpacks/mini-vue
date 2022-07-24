@@ -12,6 +12,10 @@
   - 模板解析parse
   - transform、generate生成h函数代码片段，即VNode树
 
+### 注意
+
+支持多个根节点，vue3的特性
+
 ### 标记
 
 生成h函数时，判断props与children的代码，将小范围置前，大范围置后，优化代码
