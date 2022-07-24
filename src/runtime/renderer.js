@@ -177,9 +177,18 @@ function mountComponent(vnode, container, anchor) {
     ...instance.setupState,
   };
 
-  // 判断render函数是否存在，如果render函数不存在，但是有模板
-  if (!Component.render && Component.template) {
-    const { template } = Component;
+  // 判断render函数是否存在，如果不存在，通过generate执行后生成的代码片段，通过new Function生成render函数
+  if (!Component.render) {
+    let { template } = Component;
+
+    if (template[0] === "#") {
+      /* 如果是一个#开头的挂载 如#template，而不是直接写模板 */
+      const el = document.querySelector(template);
+      template = el ? el.innerHTML : "";
+      // 删除原template节点
+      el.parentNode.removeChild(el);
+    }
+
     const code = compile(template);
     // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
     Component.render = new Function(
@@ -202,7 +211,6 @@ function mountComponent(vnode, container, anchor) {
       }`
     );
   }
-  console.log(Component.render);
 
   // 执行render函数
   instance.patch = () => {
