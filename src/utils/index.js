@@ -26,6 +26,10 @@ export function camelize(str) {
   return str.replace(/-(\w)/g, (_, c) => (c ? c.toUpperCase() : " "));
 }
 
+export function capitalize(str) {
+  return str[0].toUpperCase() + str.slice(1);
+}
+
 const HTML_TAGS =
   "html,body,base,head,link,meta,style,title,address,article,aside,footer," +
   "header,h1,h2,h3,h4,h5,h6,hgroup,nav,section,div,dd,dl,dt,figcaption," +

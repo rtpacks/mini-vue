@@ -1,7 +1,7 @@
 import { parse } from "./compiler";
 import { ref } from "./reactivity/ref";
 import { render, h, Fragment, Text } from "./runtime";
-import { createApp } from "./runtime"
+import { createApp } from "./runtime";
 
 // const vnode = h(
 //   "div",
@@ -107,8 +107,6 @@ import { createApp } from "./runtime"
 // const vnode = h(Comp, null);
 // render(vnode, document.body);
 
-
-
 // createApp({
 //   setup() {
 //     const count = ref(0);
@@ -143,4 +141,9 @@ import { createApp } from "./runtime"
 //   },
 // }).mount(document.body)
 
-console.log(parse(`<div id="foo" v-if="ok">Hello {{name}}</div>`))
+console.log(
+  parse(`<div>
+Hello World {{Hello}}
+<div>Hello World {{Hello}}</div>
+</div>`)
+);

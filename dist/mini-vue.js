@@ -51,9 +51,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "generate": () => (/* binding */ generate)
 /* harmony export */ });
 /* harmony import */ var ___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! . */ "./src/compiler/index.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
 
 
-// 接受一段语法树，返回对应可执行的代码，通过 new Function | eval 创建一段可执行代码
+
+// 接受一段语法树，返回对应的以h函数形式表达的虚拟dom树
 function generate(ast) {
   return traverseNode(ast);
 }
@@ -67,10 +69,9 @@ function generate(ast) {
 function traverseNode(node) {
   switch (node.type) {
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ROOT:
-      console.log(node.children);
       return traverseNode(node.children[0]);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ELEMENT:
-      return;
+      return createElementVNode(node);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.INTERPOLATION:
       return createInterpolationVNode(node);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.TEXT:
@@ -92,6 +93,70 @@ function createTextVNode(node) {
 function createInterpolationVNode(node) {
   // return `h(Text, null, ${node.content.content})`;
   return `h(Text, null, ${createText(node.content)})`;
+}
+
+function createElementVNode(node) {
+  const tag = createText({ content: node.tag }); //创建文本
+
+  /* 解析属性节点和指令节点 */
+  const propArr = createPropArr(node);
+  const props = propArr?.length ? `{${propArr.join(", ")}}` : "null";
+
+  /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
+  const children = traverseChildren(node);
+  if (props === "null" && children === "[]") {
+    return `h(${tag})`;
+  }
+  if (children === "[]") {
+    // 此时props不可能为 null
+    return `h(${tag}, ${props})`;
+  }
+  return `h(${tag}, ${props}, ${children})`; // props可能为null，符合正常逻辑
+}
+
+function createPropArr(node) {
+  const { props, directives } = node;
+  return [
+    ...props.map((prop) => `${props.name}: ${createText(prop.value)}`),
+    ...directives.map((dir) => {
+      /* 从ast中抽出dirname */
+      switch (dir.name) {
+        case "bind":
+          return `${dir.arg.content}: ${createText(dir.exp)}`;
+        case "on":
+          const event = `on${(0,_utils__WEBPACK_IMPORTED_MODULE_1__.capitalize)(
+            dir.arg.content
+          )}`; /* 事件名称格式化，如onClick */
+
+          let exp = dir.exp.content;
+
+          /* 简单判断是否以括号结尾，并且不包含 => 即不是一个箭头函数 */
+          if (/\([^)]*?\)$/.test(exp) && !exp.includes('=>')) {
+            exp = `$event => {${exp}}`
+          }
+
+          return `${event}: ${exp}`;
+        case "html":
+          return `innerHTML: ${createText(dir.exp)}`;
+        default:
+          break;
+      }
+    }),
+  ];
+}
+
+function traverseChildren(node) {
+  const { children } = node;
+  // 多级嵌套需要使用递归的形式进行解析，h函数中，子元素应该使用中括号包裹
+  return (
+    "[" +
+    children
+      .map((child) => {
+        return traverseNode(child);
+      })
+      .join(", ") +
+    "]"
+  );
 }
 
 
@@ -129,13 +194,19 @@ function compile(template) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "ElementTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.ElementTypes),
-/* harmony export */   "NodeTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes),
-/* harmony export */   "createRoot": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_1__.createRoot),
-/* harmony export */   "parse": () => (/* reexport safe */ _parse__WEBPACK_IMPORTED_MODULE_0__.parse)
+/* harmony export */   "ElementTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_0__.ElementTypes),
+/* harmony export */   "NodeTypes": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_0__.NodeTypes),
+/* harmony export */   "compile": () => (/* reexport safe */ _compile__WEBPACK_IMPORTED_MODULE_1__.compile),
+/* harmony export */   "createRoot": () => (/* reexport safe */ _ast__WEBPACK_IMPORTED_MODULE_0__.createRoot),
+/* harmony export */   "generate": () => (/* reexport safe */ _codegen__WEBPACK_IMPORTED_MODULE_2__.generate),
+/* harmony export */   "parse": () => (/* reexport safe */ _parse__WEBPACK_IMPORTED_MODULE_3__.parse)
 /* harmony export */ });
-/* harmony import */ var _parse__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./parse */ "./src/compiler/parse.js");
-/* harmony import */ var _ast__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ast */ "./src/compiler/ast.js");
+/* harmony import */ var _ast__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ast */ "./src/compiler/ast.js");
+/* harmony import */ var _compile__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./compile */ "./src/compiler/compile.js");
+/* harmony import */ var _codegen__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./codegen */ "./src/compiler/codegen.js");
+/* harmony import */ var _parse__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./parse */ "./src/compiler/parse.js");
+
+
 
 
 
@@ -161,6 +232,7 @@ function parse(content) {
   /* 保存原有字符串，并加上一些配置信息 */
   const context = createParseContext(content);
   /* 通过context及配置信息，编译children的ast */
+  // debugger
   const children = parseChildren(context);
   /* 生成编译后带有根节点的初始抽象语法树 */
   return (0,_ast__WEBPACK_IMPORTED_MODULE_1__.createRoot)(children);
@@ -247,9 +319,11 @@ function parseInterpolation(context) {
   // 一种形式：遇到左大括号，即分隔符好的左符号
   const [open, close] = context.options.delimiters;
   advanceBy(context, open.length); // 移除左边分割符号
+  advanceSpaces(context);
   const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
   const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
   advanceBy(context, close.length); // 移除右边分隔符号
+  advanceSpaces(context);
 
   return {
     type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.INTERPOLATION,
@@ -294,6 +368,7 @@ function parseTag(context) {
   const isSelfClosing =
     context.source.startsWith("/>") || context.options.isVoidTag(tag);
   advanceBy(context, isSelfClosing ? 2 : 1); // 自闭合截取2，非自闭合截取1
+  advanceSpaces(context); // 每当advanceBy后，需要注意去掉空格，但是不一定是一次advanceBy就一次advanceSpaces()
 
   const tagType = isComponent(context, tag)
     ? _ast__WEBPACK_IMPORTED_MODULE_1__.ElementTypes.COMPONENT
@@ -359,12 +434,12 @@ function parseSingleAttribute(context) {
       dirName = "on";
       arg = name.slice(1);
     } else if (name.startsWith("v-")) {
-      [dirName, arg] = name.slice(2).split(":");
+      [dirName, arg] = name.slice(2).split(":"); // v-if v-on v-model不存在arg，而v-bind:class存在arg
     }
 
     return {
       type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.DIRECTIVE,
-      name,
+      name: dirName,
       exp: value && {
         //等号之后的内容
         type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.SIMPLE_EXPRESSION,
@@ -403,7 +478,8 @@ function parseAttributeValue(context) {
 }
 
 function parseText(context) {
-  const endTags = ["</", context.options.delimiters[0]];
+  /* 注意：结束的标志不是</，而是<，因为中间还可以子元素节点 */
+  const endTags = ["<", context.options.delimiters[0]];
 
   // 三种结束方式
   // 1. 遇到插值的分隔符{{
@@ -890,6 +966,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
 /* harmony import */ var _reactivity_effect__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../reactivity/effect */ "./src/reactivity/effect.js");
 /* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../compiler */ "./src/compiler/index.js");
+
 
 
 
@@ -1067,6 +1145,33 @@ function mountComponent(vnode, container, anchor) {
     ...instance.props,
     ...instance.setupState,
   };
+
+  // 判断render函数是否存在，如果render函数不存在，但是有模板
+  if (!Component.render && Component.template) {
+    const { template } = Component;
+    const code = (0,_compiler__WEBPACK_IMPORTED_MODULE_5__.compile)(template);
+    // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
+    Component.render = new Function(
+      "ctx",
+      `with(ctx) {
+        const {
+          createApp,
+          render,
+          h,
+          Text,
+          Fragment,
+          nextTick,
+          reactive,
+          ref,
+          computed,
+          effect,
+          compile,
+        } = MiniVue;
+        return ${code}
+      }`
+    );
+  }
+  console.log(Component.render);
 
   // 执行render函数
   instance.patch = () => {
@@ -1270,6 +1375,8 @@ __webpack_require__.r(__webpack_exports__);
 // 调度的出现是为了性能的提高，即通过合并相同的操作，只执行一次渲染，这样就可以提高性能，调度的实现和计算属性的实现是很类似的
 /**
  * scheduler是一个类似节流的过程，
+ * 但同时jobs是可变的，又有类似防抖的过程，
+ * 如果执行一个job就删除一个job，那么就是一个节流的过程
  */
 let jobs = [];
 
@@ -1411,6 +1518,7 @@ function normalizeVNode(vnode) {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "camelize": () => (/* binding */ camelize),
+/* harmony export */   "capitalize": () => (/* binding */ capitalize),
 /* harmony export */   "hasChanged": () => (/* binding */ hasChanged),
 /* harmony export */   "isArray": () => (/* binding */ isArray),
 /* harmony export */   "isFunction": () => (/* binding */ isFunction),
@@ -1446,6 +1554,10 @@ function hasChanged(origin, current) {
 
 function camelize(str) {
   return str.replace(/-(\w)/g, (_, c) => (c ? c.toUpperCase() : " "));
+}
+
+function capitalize(str) {
+  return str[0].toUpperCase() + str.slice(1);
 }
 
 const HTML_TAGS =
@@ -1542,7 +1654,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "MiniVue": () => (/* binding */ MiniVue)
 /* harmony export */ });
-/* harmony import */ var _compiler_compile_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./compiler/compile.js */ "./src/compiler/compile.js");
+/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./compiler */ "./src/compiler/index.js");
 /* harmony import */ var _runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./runtime */ "./src/runtime/index.js");
 /* harmony import */ var _reactivity__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./reactivity */ "./src/reactivity/index.js");
 
@@ -1560,8 +1672,17 @@ const MiniVue = (window.MiniVue = {
   ref: _reactivity__WEBPACK_IMPORTED_MODULE_2__.ref,
   computed: _reactivity__WEBPACK_IMPORTED_MODULE_2__.computed,
   effect: _reactivity__WEBPACK_IMPORTED_MODULE_2__.effect,
-  compile: _compiler_compile_js__WEBPACK_IMPORTED_MODULE_0__.compile
+  compile: _compiler__WEBPACK_IMPORTED_MODULE_0__.compile,
 });
+
+console.log(
+  (0,_compiler__WEBPACK_IMPORTED_MODULE_0__.parse)(`<div v-on="ok">
+  Hello World {{Hello}}
+  <div>Hello 
+    World
+     {{Hello}}</div>
+</div>`)
+);
 
 })();
 
