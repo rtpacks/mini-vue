@@ -40,7 +40,7 @@ export function reactive(target) {
       track(target, key);
       /* 特殊情况四：深层代理，在vue2中所有的对象都被代理了，但是vue3可以选择哪些被代理 */
       // return res;
-      return isObject(res) ? reactive(reactive) : res;
+      return isObject(res) ? reactive(res) : res;
     },
     set(target, key, value, receiver) {
       /* 特殊情况三：只有值变化了才更新，如果前后是相同的值，不进行更新 */
