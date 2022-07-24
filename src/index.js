@@ -16,11 +16,11 @@ export const MiniVue = (window.MiniVue = {
   compile,
 });
 
-console.log(
-  parse(`<div v-on="ok">
-  Hello World {{Hello}}
-  <div>Hello 
-    World
-     {{Hello}}</div>
-</div>`)
-);
+// console.log(
+//   parse(`<div v-on="ok">
+//   Hello World {{Hello}}
+//   <div>Hello 
+//     World
+//      {{Hello}}</div>
+// </div>`)
+// );
