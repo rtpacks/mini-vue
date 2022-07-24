@@ -92,11 +92,11 @@ function parseInterpolation(context) {
   // 一种形式：遇到左大括号，即分隔符好的左符号
   const [open, close] = context.options.delimiters;
   advanceBy(context, open.length); // 移除左边分割符号
-  advanceSpaces(context)
+  advanceSpaces(context);
   const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
   const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
   advanceBy(context, close.length); // 移除右边分隔符号
-  advanceSpaces(context)
+  advanceSpaces(context);
 
   return {
     type: NodeTypes.INTERPOLATION,
@@ -141,7 +141,7 @@ function parseTag(context) {
   const isSelfClosing =
     context.source.startsWith("/>") || context.options.isVoidTag(tag);
   advanceBy(context, isSelfClosing ? 2 : 1); // 自闭合截取2，非自闭合截取1
-  advanceSpaces(context) // 每当advanceBy后，需要注意去掉空格，但是不一定是一次advanceBy就一次advanceSpaces()
+  advanceSpaces(context); // 每当advanceBy后，需要注意去掉空格，但是不一定是一次advanceBy就一次advanceSpaces()
 
   const tagType = isComponent(context, tag)
     ? ElementTypes.COMPONENT
@@ -207,12 +207,12 @@ function parseSingleAttribute(context) {
       dirName = "on";
       arg = name.slice(1);
     } else if (name.startsWith("v-")) {
-      [dirName, arg] = name.slice(2).split(":");
+      [dirName, arg] = name.slice(2).split(":"); // v-if v-on v-model不存在arg，而v-bind:class存在arg
     }
 
     return {
       type: NodeTypes.DIRECTIVE,
-      name,
+      name: dirName,
       exp: value && {
         //等号之后的内容
         type: NodeTypes.SIMPLE_EXPRESSION,
