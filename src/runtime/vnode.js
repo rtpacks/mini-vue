@@ -28,8 +28,10 @@ export function h(type, props, children) {
       break;
     case "string":
       shapeFlag |= ShapeFlags.ELEMENT; /* 普通元素标签 */
+      break;
     case "symbol" /* 符号类型要么是TEXT要么是FRAGMENT */:
       shapeFlag |= type === Text ? ShapeFlags.TEXT : ShapeFlags.FRAGMENT;
+      break;
   }
   switch (typeof children /* 判断自身 */) {
     case "object":
@@ -56,19 +58,19 @@ export function h(type, props, children) {
     props,
     children,
     shapeFlag,
-    el: null, /* 代表当前虚拟dom对应的真实dom */
-    anchor: null, /* 锚用于定位 */
+    el: null /* 代表当前虚拟dom对应的真实dom */,
+    anchor: null /* 锚用于定位 */,
   };
 }
 
 export function normalizeVNode(vnode) {
   if (isArray(vnode)) {
-    return h(Fragment, null, vnode)
+    return h(Fragment, null, vnode);
   }
   if (isObject(vnode)) {
-    return vnode
+    return vnode;
   }
   if (isString(vnode) || isNumber(vnode)) {
-    return h(Text, null, vnode.toString())
+    return h(Text, null, vnode.toString());
   }
 }
