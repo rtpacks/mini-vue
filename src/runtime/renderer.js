@@ -59,7 +59,7 @@ function patch(_vnode, vnode, container, anchor) {
 
   if (!isSameVNodeType(_vnode, vnode)) {
     // 类型不同，卸载旧vnode，需要更新锚位置，即新vnode插入的位置
-    // anchor = _vnode.anchor || _vnode.el.nextSibling;
+    // anchor = _vnode.anchor || _vnode.el.nextSibling; 错误
     anchor = _vnode.el.nextSibling || _vnode.anchor;
     unmount(_vnode);
     mount(vnode, container, anchor);
