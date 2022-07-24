@@ -15,7 +15,7 @@ export function generate(ast) {
 function traverseNode(node) {
   switch (node.type) {
     case NodeTypes.ROOT:
-      return traverseNode(node.children[0]);
+      return traverseChildren(node);
     case NodeTypes.ELEMENT:
       return createElementVNode(node);
     case NodeTypes.INTERPOLATION:
