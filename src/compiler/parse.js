@@ -5,7 +5,6 @@ export function parse(content) {
   /* 保存原有字符串，并加上一些配置信息 */
   const context = createParseContext(content);
   /* 通过context及配置信息，编译children的ast */
-  // debugger
   const children = parseChildren(context);
   /* 生成编译后带有根节点的初始抽象语法树 */
   return createRoot(children);

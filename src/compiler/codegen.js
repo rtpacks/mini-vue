@@ -46,31 +46,40 @@ function createInterpolationVNode(node) {
 }
 
 function resolveElementVNode(node) {
-  const { tag, directives } = node;
+  const { directives } = node;
+  const tag = createText({ content: node.tag }); // tag应该为字符串
+
   // debugger;
   // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
   const forNode = pluck(directives, "for");
   if (forNode) {
-    // 如果存在v-for指令节点
-    // <div v-for="(item, index) in items">{{item + index}}</div>
     // 编译目标
+    // <div v-for="(item, index) in items">{{item + index}}</div>
     // h(
     //   Fragment,
     //   null,
     //   renderList(items, (item, index) => h('div', null, item + index))
     // );
-
-    const props = formatProps(node);
-
     const [args, sources] = forNode.exp.content.split(/\sin\s|\sof\s/); // in of 相同
     return `h(
       Fragment, 
       null, 
       renderList(
-        ${sources}, 
-        ${args} => h('${tag}', ${props}, ${traverseChildren(node)}))
+        ${sources.trim()}, ${args.trim()} => ${resolveElementVNode(node)})
       )`;
   }
+
+  const ifNode = pluck(directives, "if");
+  if (ifNode) {
+    // 编译目标
+    // <div v-if="ok"></div>
+    // ok ? h('div') : h(Text, null, ''); 空文本节点
+    const condition = ifNode.exp.content;
+    return `${condition} 
+      ? ${resolveElementVNode(node)} 
+      : h(Text, null, '')`;
+  }
+
   return createElementVNode(node);
 }
 
@@ -120,16 +129,11 @@ function createPropArr(node) {
         case "html":
           return `innerHTML: ${createText(dir.exp)}`;
         default:
-          break;
+          return `${dir.arg?.content || dir.name}: ${createText(dir.exp)}`;
+        // return dir; // 没有处理的不能原样返回
       }
     }),
   ];
-}
-
-function formatProps(node) {
-  /* 解析属性节点和指令节点，生成对应的字符串格式 */
-  const propArr = createPropArr(node);
-  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 function traverseChildren(node) {
@@ -144,6 +148,13 @@ function traverseChildren(node) {
       .join(", ") +
     "]"
   );
+}
+
+function formatProps(node) {
+  // 每一个不同的指令节点，不能共用，因为pluck会删除元素
+  /* 解析属性节点和指令节点，生成对应的字符串格式 */
+  const propArr = createPropArr(node);
+  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 /**
