@@ -76,11 +76,7 @@ function parseChildren(context) {
     }
   }
 
-  return removedWhiteSpaces
-    ? nodes.filter((node) => {
-        return !node;
-      })
-    : nodes;
+  return removedWhiteSpaces ? nodes.filter((node) => node) : nodes;
 }
 
 function isTextEnd(context) {
