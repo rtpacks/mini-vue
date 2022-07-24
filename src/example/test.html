@@ -9,10 +9,14 @@
   <script src="../../dist/mini-vue.js"></script>
 
   <body>
+    <!-- <div>Counter：{{counter.value}}</div>
+    <button @click="sub">-</button>
+    <button @click="add">+</button> -->
+    <div class="index"></div>
     <div id="app">
-      <div>Counter：{{counter.value}}</div>
-      <button @click="sub">-</button>
-      <button @click="add">+</button>
+      <div v-for="(frined, index) in friends" :key="frined.name">
+        {{index+1 +' · '+ frined.name}}
+      </div>
     </div>
     <script>
       const { createApp, ref, reactive } = MiniVue;
@@ -29,16 +33,16 @@
           const counter = ref(0);
           const add = () => (counter.value += 3);
           const sub = () => counter.value--;
-          const ok = ref(true);
-          const toggle = () => (ok.value = !ok.value);
-
-          const test = ref("hello");
+          // debugger
+          const friends = reactive([
+            { name: "小黄" },
+            { name: "小黄" },
+          ]);
           return {
             counter,
             add,
             sub,
-            ok,
-            toggle,
+            friends,
           };
         },
       }).mount("#app");

@@ -1,9 +1,18 @@
 import { compile, parse } from "./compiler";
-import { createApp, render, h, Text, Fragment, nextTick } from "./runtime";
+import {
+  createApp,
+  render,
+  h,
+  Text,
+  Fragment,
+  nextTick,
+  renderList,
+} from "./runtime";
 import { reactive, ref, computed, effect } from "./reactivity";
 
 export const MiniVue = (window.MiniVue = {
   createApp,
+  parse,
   render,
   h,
   Text,
@@ -14,12 +23,13 @@ export const MiniVue = (window.MiniVue = {
   computed,
   effect,
   compile,
+  renderList,
 });
 
 // console.log(
 //   parse(`<div v-on="ok">
 //   Hello World {{Hello}}
-//   <div>Hello 
+//   <div>Hello
 //     World
 //      {{Hello}}</div>
 // </div>`)

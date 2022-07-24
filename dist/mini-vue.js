@@ -71,7 +71,11 @@ function traverseNode(node) {
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ROOT:
       return traverseChildren(node);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ELEMENT:
-      return createElementVNode(node);
+      // 指令节点都在元素节点中，所以处理元素节点的同时也是处理指令节点，
+      // 并且对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
+      // runtime中的helper，对于v-for为renderList
+      return resolveElementVNode(node);
+    // return createElementVNode(node);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.INTERPOLATION:
       return createInterpolationVNode(node);
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.TEXT:
@@ -95,12 +99,39 @@ function createInterpolationVNode(node) {
   return `h(Text, null, ${createText(node.content)})`;
 }
 
+function resolveElementVNode(node) {
+  const { tag, directives } = node;
+  // debugger;
+  // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
+  const forNode = pluck(directives, "for");
+  if (forNode) {
+    // 如果存在v-for指令节点
+    // <div v-for="(item, index) in items">{{item + index}}</div>
+    // 编译目标
+    // h(
+    //   Fragment,
+    //   null,
+    //   renderList(items, (item, index) => h('div', null, item + index))
+    // );
+
+    const props = formatProps(node);
+
+    const [args, sources] = forNode.exp.content.split(/\sin\s|\sof\s/); // in of 相同
+    return `h(
+      Fragment, 
+      null, 
+      renderList(
+        ${sources}, 
+        ${args} => h('${tag}', ${props}, ${traverseChildren(node)}))
+      )`;
+  }
+  return createElementVNode(node);
+}
+
 function createElementVNode(node) {
   const tag = createText({ content: node.tag }); //创建文本
 
-  /* 解析属性节点和指令节点 */
-  const propArr = createPropArr(node);
-  const props = propArr?.length ? `{${propArr.join(", ")}}` : "null";
+  const props = formatProps(node);
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
   const children = traverseChildren(node);
@@ -117,7 +148,7 @@ function createElementVNode(node) {
 function createPropArr(node) {
   const { props, directives } = node;
   return [
-    ...props.map((prop) => `${props.name}: ${createText(prop.value)}`),
+    ...props.map((prop) => `${prop.name}: ${createText(prop.value)}`),
     ...directives.map((dir) => {
       /* 从ast中抽出dirname */
       switch (dir.name) {
@@ -130,9 +161,13 @@ function createPropArr(node) {
 
           let exp = dir.exp.content;
 
-          /* 简单判断是否以括号结尾，并且不包含 => 即不是一个箭头函数 */
-          if (/\([^)]*?\)$/.test(exp) && !exp.includes('=>')) {
-            exp = `$event => {${exp}}`
+          /* 不包含 => 即不是一个箭头函数 */
+          if (
+            (/\([^)]*?\)$/.test(exp) || // 带有括号形式
+              /\+\+|--|\+=|-=|\*=|\/=|\%=|==|===/.test(exp)) && // ++ -- 形式
+            !exp.includes("=>") // 不是箭头函数
+          ) {
+            exp = `$event => {${exp}}`;
           }
 
           return `${event}: ${exp}`;
@@ -143,6 +178,12 @@ function createPropArr(node) {
       }
     }),
   ];
+}
+
+function formatProps(node) {
+  /* 解析属性节点和指令节点，生成对应的字符串格式 */
+  const propArr = createPropArr(node);
+  return propArr?.length ? `{${propArr.join(", ")}}` : "null";
 }
 
 function traverseChildren(node) {
@@ -157,6 +198,21 @@ function traverseChildren(node) {
       .join(", ") +
     "]"
   );
+}
+
+/**
+ * 表示接受一个指令集合、指令名称、是否移除指令
+ * @param {*} directives
+ * @param {*} name
+ * @param {Boolean} remove:true
+ */
+function pluck(directives = [], name, remove = true) {
+  const idx = directives.findIndex((dir) => dir.name === name); // 找对应名字的指令
+  const dir = directives[idx];
+  if (dir && remove) {
+    directives.splice(idx, 1); // 如果存在，并且需要删除，则删除对应的指令节点
+  }
+  return dir;
 }
 
 
@@ -179,7 +235,6 @@ __webpack_require__.r(__webpack_exports__);
 
 function compile(template) {
   const ast = (0,_parse__WEBPACK_IMPORTED_MODULE_1__.parse)(template); // 解析模板得到ast
-  // console.log(ast)
   const code = (0,_codegen__WEBPACK_IMPORTED_MODULE_0__.generate)(ast); // 解析ast得到一段可执行的代码
   return code;
 }
@@ -320,7 +375,7 @@ function parseInterpolation(context) {
   const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
   const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
   advanceBy(context, close.length); // 移除右边分隔符号
-  advanceSpaces(context);
+  // advanceSpaces(context); 此时不能移除剩余的空格，后续会有空格优化！如{{index}} : {{item}}
 
   return {
     type: _ast__WEBPACK_IMPORTED_MODULE_1__.NodeTypes.INTERPOLATION,
@@ -790,7 +845,7 @@ function reactive(target) {
       (0,_effect__WEBPACK_IMPORTED_MODULE_1__.track)(target, key);
       /* 特殊情况四：深层代理，在vue2中所有的对象都被代理了，但是vue3可以选择哪些被代理 */
       // return res;
-      return (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isObject)(res) ? reactive(reactive) : res;
+      return (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isObject)(res) ? reactive(res) : res;
     },
     set(target, key, value, receiver) {
       /* 特殊情况三：只有值变化了才更新，如果前后是相同的值，不进行更新 */
@@ -929,6 +984,71 @@ function createApp(root) {
 
 /***/ }),
 
+/***/ "./src/runtime/helper/index.js":
+/*!*************************************!*\
+  !*** ./src/runtime/helper/index.js ***!
+  \*************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "renderList": () => (/* reexport safe */ _renderList__WEBPACK_IMPORTED_MODULE_0__.renderList)
+/* harmony export */ });
+/* harmony import */ var _renderList__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./renderList */ "./src/runtime/helper/renderList.js");
+
+
+/***/ }),
+
+/***/ "./src/runtime/helper/renderList.js":
+/*!******************************************!*\
+  !*** ./src/runtime/helper/renderList.js ***!
+  \******************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "renderList": () => (/* binding */ renderList)
+/* harmony export */ });
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils */ "./src/utils/index.js");
+// 编译目标
+// h(
+//   Fragment,
+//   null,
+//   renderList(items, (item, index) => h('div', null, item + index))
+// );
+
+
+
+function renderList(sources, renderItem) {
+  // v-for可能存在的形式
+  // Array，Object，String，Number
+  if (
+    (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(sources) ||
+    ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(sources) && (sources = sources.split("")))
+  ) {
+    return sources.map((source, index) => renderItem(source, index));
+  }
+
+  let nodes = [];
+  if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isNumber)(sources)) {
+    // const arr = Array.from({ length: sources }, (v, i) => i + 1);
+    for (let i = 0; i < sources; i++) {
+      nodes.push(renderItem(i + 1, i));
+    }
+    return nodes;
+  }
+
+  if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isObject)(sources)) {
+    // for in, for of, Object.keys
+    return Object.keys(sources).map((key, index) =>
+      renderItem(sources[key], key, index)
+    );
+  }
+}
+
+
+/***/ }),
+
 /***/ "./src/runtime/index.js":
 /*!******************************!*\
   !*** ./src/runtime/index.js ***!
@@ -944,12 +1064,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "h": () => (/* reexport safe */ _vnode__WEBPACK_IMPORTED_MODULE_3__.h),
 /* harmony export */   "mount": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.mount),
 /* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_2__.nextTick),
-/* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render)
+/* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render),
+/* harmony export */   "renderList": () => (/* reexport safe */ _helper__WEBPACK_IMPORTED_MODULE_4__.renderList)
 /* harmony export */ });
 /* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
 /* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
 /* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _helper__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./helper */ "./src/runtime/helper/index.js");
+
 
 
 
@@ -1174,6 +1297,7 @@ function mountComponent(vnode, container, anchor) {
       `with(ctx) {
         const {
           createApp,
+          parse,
           render,
           h,
           Text,
@@ -1184,6 +1308,7 @@ function mountComponent(vnode, container, anchor) {
           computed,
           effect,
           compile,
+          renderList,
         } = MiniVue;
         return ${code}
       }`
@@ -1680,6 +1805,7 @@ __webpack_require__.r(__webpack_exports__);
 
 const MiniVue = (window.MiniVue = {
   createApp: _runtime__WEBPACK_IMPORTED_MODULE_1__.createApp,
+  parse: _compiler__WEBPACK_IMPORTED_MODULE_0__.parse,
   render: _runtime__WEBPACK_IMPORTED_MODULE_1__.render,
   h: _runtime__WEBPACK_IMPORTED_MODULE_1__.h,
   Text: _runtime__WEBPACK_IMPORTED_MODULE_1__.Text,
@@ -1690,17 +1816,17 @@ const MiniVue = (window.MiniVue = {
   computed: _reactivity__WEBPACK_IMPORTED_MODULE_2__.computed,
   effect: _reactivity__WEBPACK_IMPORTED_MODULE_2__.effect,
   compile: _compiler__WEBPACK_IMPORTED_MODULE_0__.compile,
+  renderList: _runtime__WEBPACK_IMPORTED_MODULE_1__.renderList,
 });
 
 // console.log(
 //   parse(`<div v-on="ok">
 //   Hello World {{Hello}}
-//   <div>Hello 
+//   <div>Hello
 //     World
 //      {{Hello}}</div>
 // </div>`)
 // );
-
 })();
 
 /******/ })()

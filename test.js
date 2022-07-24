@@ -65,10 +65,26 @@ console.log((1, 2, 3, 4));
 第一个中括号表示数组对象，第二个中括号表示用key取值，[1][0]==1, [1][1]==undefined */
 
 // [1,2,3,4]对象，[1,2]==[(1,2)]=[2]，所以[1,2,3,4][1,2]=[1,2,3,4][2]=3
-console.log([1, 2, 3, 4][(1, 2)]); 
+console.log([1, 2, 3, 4][(1, 2)]);
 
-console.log([].map(child => "<>").join(','), "===")
+console.log([].map((child) => "<>").join(","), "===");
 
-console.log(/(\+\+|--|\+=|-=|\*=|\/=)?[\t ]*?$/.test('() i++ \n\n'))
+console.log(/(\+\+|--|\+=|-=|\*=|\/=)?[\t ]*?$/.test("() i++ \n\n"));
 
-console.log({} instanceof HTMLElement)
+// console.log({} instanceof HTMLElement)
+
+// console.log("(item, index) in items".split(/\sin\s|\sof\s/))
+console.log("123".split(""));
+console.log([...new Array(10).keys()]);
+console.log(Array.from({ length: 10 }, (_, i) => i + 1));
+
+console.log(Object.entries({ wode: "世界", H: "Hosh " }));
+
+obj = {
+  name: "lisi",
+  age: 18,
+  height: 1.9,
+};
+const { age } = obj;
+console.log(age);
+console.log(obj);
