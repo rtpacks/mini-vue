@@ -92,7 +92,7 @@ function parseInterpolation(context) {
   const len = context.source.indexOf(close); // 不要和数组的方法findIndex混淆了
   const content = sliceStr(context, len).trim(); // 获取插值变量，注意需要去除空格
   advanceBy(context, close.length); // 移除右边分隔符号
-  advanceSpaces(context);
+  // advanceSpaces(context); 此时不能移除剩余的空格，后续会有空格优化！如{{index}} : {{item}}
 
   return {
     type: NodeTypes.INTERPOLATION,
