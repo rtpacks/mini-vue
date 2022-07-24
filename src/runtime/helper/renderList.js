@@ -14,11 +14,12 @@ export function renderList(sources, renderItem) {
     isArray(sources) ||
     (isString(sources) && (sources = sources.split("")))
   ) {
+    // debugger
     return sources.map((source, index) => renderItem(source, index));
   }
 
-  let nodes = [];
   if (isNumber(sources)) {
+    let nodes = [];
     // const arr = Array.from({ length: sources }, (v, i) => i + 1);
     for (let i = 0; i < sources; i++) {
       nodes.push(renderItem(i + 1, i));
