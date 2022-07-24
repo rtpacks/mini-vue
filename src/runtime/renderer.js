@@ -3,6 +3,7 @@ import { h, normalizeVNode, ShapeFlags } from "./vnode";
 import { isFunction } from "../utils";
 import { effect } from "../reactivity/effect";
 import { scheduler } from "./scheduler";
+import { compile } from "../compiler";
 
 /**
  * render 渲染VNode，虚拟DOM很多种类型，相应的挂载到真实DOM上也是很多方式，也就是很多种类型的unmount/patch函数
@@ -175,6 +176,33 @@ function mountComponent(vnode, container, anchor) {
     ...instance.props,
     ...instance.setupState,
   };
+
+  // 判断render函数是否存在，如果render函数不存在，但是有模板
+  if (!Component.render && Component.template) {
+    const { template } = Component;
+    const code = compile(template);
+    // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
+    Component.render = new Function(
+      "ctx",
+      `with(ctx) {
+        const {
+          createApp,
+          render,
+          h,
+          Text,
+          Fragment,
+          nextTick,
+          reactive,
+          ref,
+          computed,
+          effect,
+          compile,
+        } = MiniVue;
+        return ${code}
+      }`
+    );
+  }
+  console.log(Component.render);
 
   // 执行render函数
   instance.patch = () => {
