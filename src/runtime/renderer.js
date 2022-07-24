@@ -196,6 +196,7 @@ function mountComponent(vnode, container, anchor) {
       `with(ctx) {
         const {
           createApp,
+          parse,
           render,
           h,
           Text,
@@ -206,6 +207,7 @@ function mountComponent(vnode, container, anchor) {
           computed,
           effect,
           compile,
+          renderList,
         } = MiniVue;
         return ${code}
       }`
