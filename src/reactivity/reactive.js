@@ -29,7 +29,7 @@ export function reactive(target) {
 
   /* 特殊情况二：多个依赖依赖于同一个对象，只生成一个代理对象，使用一个WeakMap来存储每一个代理对象 */
   if (proxyMap.has(target)) {
-    return reactive.get(target);
+    return proxyMap.get(target);
   }
 
   /* 如果是一个对象，那么就返回一个代理对象 */
