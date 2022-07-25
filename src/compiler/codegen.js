@@ -1,7 +1,7 @@
 import { NodeTypes } from ".";
 import { capitalize } from "../utils";
 
-// 接受一段语法树，返回对应的以h函数形式表达的虚拟dom树
+// 接受一段语法树，返回对应的以h函数代码片段形式表达的虚拟dom树
 export function generate(ast) {
   return traverseNode(ast);
 }
@@ -9,18 +9,22 @@ export function generate(ast) {
 /**
  * 编译节点树，关注四个基本的节点类型，生成h函数的字符串
  * 注意，这些函数都是生成h函数的代码，即一段代码文本，而不是直接执行函数
+ * 刚开始执行必然是ROOT节点，parent首先是undefined，
+ * traverseChildren函数是parent参数的真正入口
  * @param {*} node
  * @returns
  */
-function traverseNode(node) {
+function traverseNode(node, parent) {
   switch (node.type) {
     case NodeTypes.ROOT:
       return traverseChildren(node);
     case NodeTypes.ELEMENT:
-      // 指令节点都在元素节点中，所以处理元素节点的同时也是处理指令节点，
-      // 并且对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
-      // runtime中的helper，对于v-for为renderList
-      return resolveElementVNode(node);
+      // 指令节点都在元素节点中，处理元素节点的同时也处理指令节点
+      // 对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
+      // v-for使用renderList
+
+      // traverseChildren是parent参数的真正入口
+      return resolveElementVNode(node, parent);
     // return createElementVNode(node);
     case NodeTypes.INTERPOLATION:
       return createInterpolationVNode(node);
@@ -45,16 +49,15 @@ function createInterpolationVNode(node) {
   return `h(Text, null, ${createText(node.content)})`;
 }
 
-function resolveElementVNode(node) {
+function resolveElementVNode(node, parent) {
   const { directives } = node;
-  const tag = createText({ content: node.tag }); // tag应该为字符串
 
   // debugger;
   // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
   const forNode = pluck(directives, "for");
   if (forNode) {
-    // 编译目标
     // <div v-for="(item, index) in items">{{item + index}}</div>
+    // 编译目标
     // h(
     //   Fragment,
     //   null,
@@ -65,19 +68,61 @@ function resolveElementVNode(node) {
       Fragment, 
       null, 
       renderList(
-        ${sources.trim()}, ${args.trim()} => ${resolveElementVNode(node)})
+        ${sources.trim()}, 
+        ${args.trim()} => ${resolveElementVNode(node, parent)})
       )`;
   }
 
-  const ifNode = pluck(directives, "if");
+  const ifNode = pluck(directives, "if") || pluck(directives, "else-if");
   if (ifNode) {
-    // 编译目标
     // <div v-if="ok"></div>
+    // v-if编译目标
     // ok ? h('div') : h(Text, null, ''); 空文本节点
+
+    // <h1 v-if="ok"></h1>
+    // <h2 v-else></h2>
+    // <h3></h3>
+    // v-else编译目标
+    // [
+    //   ok ? h("h1") : h("h2"),
+    //   h("h3")
+    // ]
+
+    // <h1 v-if="ok"></h1>
+    // <h2 v-else-if="ok2"></h2>
+    // v-else-if编译目标
+    // ok
+    // ? h('h1')
+    // : ok2
+    //   ? h('h2')
+    //   : h(Text, null, '');
+
     const condition = ifNode.exp.content;
-    return `${condition} 
-      ? ${resolveElementVNode(node)} 
-      : h(Text, null, '')`;
+    let ifExp = `${resolveElementVNode(node, parent)}`;
+    let elseExp = `h(Text, null, '')`; // 默认的else表达式
+
+    // 当前node是ifNode的父节点，elseNode存放于当前node的parent的后续children中，需要与当前node相邻，中间可以存在空白字符节点，只需要检查下一个Element类型的节点是否包含else指令，如果是需要删除中间的空白字符节点，不需要一直判断下去
+    // 需要parent节点才能拿到children，改造函数resolveElementVNode(node, parent)，traverseChildren是parent参数的真正入口
+    const ifIdx = parent.children.indexOf(node);
+    let idx = ifIdx;
+    while (idx < parent.children.length) {
+      const child = parent.children[++idx];
+      // 检查下一个ELEMENT节点，而不是下一个节点
+      if (child?.type === NodeTypes.ELEMENT) {
+        // 如果存在elseIfNode，删除中间空白节点，但是此时else-if不能删除，可以看成是小范围的if，在ifNode时删除即可
+        if (pluck(child.directives, "else-if", false)) {
+          parent.children.splice(ifIdx, idx - ifIdx);
+          elseExp = `${resolveElementVNode(child, parent)}`;
+        }
+        // 如果存在elseNode，删除中间的空白字符节点
+        if (pluck(child.directives, "else")) {
+          parent.children.splice(ifIdx, idx - ifIdx); // 需要先删除，否则会重复
+          elseExp = `${resolveElementVNode(child, parent)}`;
+        }
+        break;
+      }
+    }
+    return `${condition} ? ${ifExp} : ${elseExp}`;
   }
 
   return createElementVNode(node);
@@ -139,12 +184,12 @@ function createPropArr(node) {
 function traverseChildren(node) {
   const { children } = node;
   // 多级嵌套需要使用递归的形式进行解析，h函数中，子元素应该使用中括号包裹
+  // 特别注意map会返回一个相同长度的数组，但是在map的过程中，可能会返回item === undefined的元素，需要filter去除，或者使用reduce
   return (
     "[" +
     children
-      .map((child) => {
-        return traverseNode(child);
-      })
+      .map((child) => traverseNode(child, node))
+      .filter((child) => child)
       .join(", ") +
     "]"
   );
