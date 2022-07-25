@@ -1,5 +1,5 @@
 import { NodeTypes, ElementTypes } from ".";
-import { resolveComponentName } from "../runtime";
+import { resolveComponent } from "../runtime";
 import { capitalize } from "../utils";
 
 // 接受一段语法树，返回对应的以h函数代码片段形式表达的虚拟dom树
@@ -16,6 +16,8 @@ export function generate(ast) {
  * @returns
  */
 function traverseNode(node, parent) {
+  // debugger;
+
   switch (node.type) {
     case NodeTypes.ROOT:
       return traverseChildren(node);
@@ -131,10 +133,11 @@ function createElementVNode(node) {
   // const tag = createText({ content: node.tag }); //创建文本
   // 真实的场景中，还会有自定义组件，即通过components:{} 传入的组件名称，需要在createApp函数中获取组件的名称
   let { tag, tagType } = node;
+  tag = createText({ content: tag }); // 无论是普通标签还是组件对象名称都是字符串
   tag =
     tagType === ElementTypes.ELEMENT
-      ? createText({ content: tag }) // 普通类型
-      : `${resolveComponentName(tag)}`; // 组件对象类型
+      ? tag // 普通类型
+      : `resolveComponent(${tag})`; // 组件对象类型，使用对应的方法获取
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
   const props = formatProps(node);
@@ -219,7 +222,7 @@ function createPropArr(node) {
 function traverseChildren(node) {
   const { children } = node;
   // 多级嵌套需要使用递归的形式进行解析，h函数中，子元素应该使用中括号包裹
-  // 特别注意map会返回一个相同长度的数组，但是在map的过程中，可能会返回item === undefined的元素，需要filter去除，或者使用reduce
+  // 特别注意map会返回一个相同长度的数组，可能会返回item === undefined的元素，需要filter去除，或者使用reduce
   return (
     "[" +
     children
