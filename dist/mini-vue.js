@@ -71,6 +71,8 @@ function generate(ast) {
  * @returns
  */
 function traverseNode(node, parent) {
+  // debugger;
+
   switch (node.type) {
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ROOT:
       return traverseChildren(node);
@@ -186,10 +188,11 @@ function createElementVNode(node) {
   // const tag = createText({ content: node.tag }); //创建文本
   // 真实的场景中，还会有自定义组件，即通过components:{} 传入的组件名称，需要在createApp函数中获取组件的名称
   let { tag, tagType } = node;
+  tag = createText({ content: tag }); // 无论是普通标签还是组件对象名称都是字符串
   tag =
     tagType === ___WEBPACK_IMPORTED_MODULE_0__.ElementTypes.ELEMENT
-      ? createText({ content: tag }) // 普通类型
-      : `${(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponentName)(tag)}`; // 组件对象类型
+      ? tag // 普通类型
+      : `resolveComponent(${tag})`; // 组件对象类型，使用对应的方法获取
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
   const props = formatProps(node);
@@ -274,7 +277,7 @@ function createPropArr(node) {
 function traverseChildren(node) {
   const { children } = node;
   // 多级嵌套需要使用递归的形式进行解析，h函数中，子元素应该使用中括号包裹
-  // 特别注意map会返回一个相同长度的数组，但是在map的过程中，可能会返回item === undefined的元素，需要filter去除，或者使用reduce
+  // 特别注意map会返回一个相同长度的数组，可能会返回item === undefined的元素，需要filter去除，或者使用reduce
   return (
     "[" +
     children
@@ -1031,6 +1034,178 @@ function convert(value) {
 
 /***/ }),
 
+/***/ "./src/runtime/component.js":
+/*!**********************************!*\
+  !*** ./src/runtime/component.js ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "mountComponent": () => (/* binding */ mountComponent),
+/* harmony export */   "patchComponent": () => (/* binding */ patchComponent),
+/* harmony export */   "unmountComponent": () => (/* binding */ unmountComponent)
+/* harmony export */ });
+/* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
+/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
+/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../compiler */ "./src/compiler/index.js");
+/* harmony import */ var _reactivity__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../reactivity */ "./src/reactivity/index.js");
+
+
+
+
+
+
+
+// 组件由两个阶段生成
+// 第一阶段是原生的不经过h函数包裹的组件对象 如 {setup(){}, render() {return h('div', null, "我是小明")}}
+// 第二阶段是经过h函数包裹的vnode对象，如 h(Comp, vnodeProps);
+
+// vnode的props属性有两种：1. 内部使用的props父传子，2.组件attrs标签属性
+// 组件对象：Component，虚拟DOM：vnode
+
+function fallThrough(instance, subTree) {
+  subTree.props = {
+    ...(instance.attrs || {}),
+    ...(subTree.props || {}),
+  };
+}
+
+function patchInsProps(instance, vnode) {
+  const { type: Component, props: vnodeProps } = vnode; /* 获取组件对象 */
+
+  // 区分不同的属性
+  instance.props ||= {};
+  instance.attrs ||= {};
+  for (const key in vnodeProps) {
+    if (Component.props?.includes(key)) {
+      instance.props[key] = vnodeProps[key];
+    } else {
+      instance.attrs[key] = vnodeProps[key];
+    }
+  }
+  instance.props = (0,_reactivity__WEBPACK_IMPORTED_MODULE_4__.reactive)(instance.props); /* 做响应式处理 */
+}
+
+function mountComponent(vnode, container, anchor) {
+  const { type: Component } = vnode;
+
+  const instance = (vnode.component = {
+    props: null,
+    attrs: null,
+
+    setupState: null,
+    ctx: null,
+
+    subTree: null,
+    patch: null,
+
+    next: null,
+  });
+
+  patchInsProps(instance, vnode);
+
+  // 对于vue3，执行setup函数，获取返回值setupState，通过effect确定响应数据，最终通过render产出vnode，render接收ctx
+  instance.setupState = Component.setup?.(instance.props, {
+    attrs: instance.attrs,
+  });
+  instance.ctx = {
+    ...instance.props,
+    ...instance.setupState,
+  };
+
+  // 判断render函数是否存在，如果不存在，通过generate生成的h代码片段，通过new Function生成render函数
+  if (!Component.render && Component.template) {
+    let { template } = Component;
+
+    if (template[0] === "#") {
+      /* 如果是一个#开头的mount 如#template */
+      const el = document.querySelector(template);
+      template = el ? el.innerHTML : "";
+      // 删除原template节点
+      el.parentNode.removeChild(el);
+    }
+
+    const code = (0,_compiler__WEBPACK_IMPORTED_MODULE_3__.compile)(template);
+    // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
+    Component.render = new Function(
+      "ctx",
+      `with(ctx) {
+        const {
+          createApp,
+          parse,
+          render,
+          h,
+          Text,
+          Fragment,
+          nextTick,
+          reactive,
+          ref,
+          computed,
+          effect,
+          compile,
+          renderList,
+          resolveComponent,
+        } = MiniVue;
+        return ${code} ;
+      }`
+    );
+  }
+
+  console.log("组件的render");
+
+  // 执行render函数
+  /* 通过effect默认执行代表mount，当变量发生改变时也会重新执行 */
+  instance.patch = (0,_reactivity__WEBPACK_IMPORTED_MODULE_4__.effect)(
+    () => {
+      const preTree = instance.subTree;
+      /* 生成vnode，存储在自身的subTree属性，作为旧tree */
+      const subTree = (instance.subTree = (0,_vnode__WEBPACK_IMPORTED_MODULE_2__.normalizeVNode)(
+        Component.render(instance.ctx)
+      ));
+
+      console.log("patch执行了")
+
+      // preTree存在，表示更新
+      if (preTree) {
+        // next存在，被动更新
+        if (instance.next) {
+          vnode = instance.next;
+          instance.next = null;
+          patchInsProps(instance, vnode);
+          instance.ctx = {
+            ...instance.props,
+            ...instance.setupState,
+          };
+        }
+      }
+
+      // 当返回单根节点时，属性继承
+      fallThrough(instance, subTree);
+      /* 并不会造成递归，因为render函数生成vnode不再是Comp对象，生成的是div等vnode */
+      (0,_renderer__WEBPACK_IMPORTED_MODULE_0__.patch)(preTree, subTree, container, anchor);
+      vnode.el = subTree.el;
+    },
+    {
+      scheduler: _scheduler__WEBPACK_IMPORTED_MODULE_1__.scheduler, //trigger优先执行scheduler，并将传入的fn传入scheduler函数,
+    }
+  );
+}
+
+function patchComponent(_vnode, vnode, container, anchor) {
+  vnode.component = _vnode.component;
+  vnode.component.next = vnode;
+  vnode.component.patch();
+}
+
+function unmountComponent(vnode) {
+  (0,_renderer__WEBPACK_IMPORTED_MODULE_0__.unmount)(vnode.component.subTree);
+}
+
+
+/***/ }),
+
 /***/ "./src/runtime/createApp.js":
 /*!**********************************!*\
   !*** ./src/runtime/createApp.js ***!
@@ -1040,7 +1215,7 @@ function convert(value) {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "createApp": () => (/* binding */ createApp),
-/* harmony export */   "resolveComponentName": () => (/* binding */ resolveComponentName)
+/* harmony export */   "resolveComponent": () => (/* binding */ resolveComponent)
 /* harmony export */ });
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
@@ -1075,7 +1250,7 @@ function createApp(root) {
   return app;
 }
 
-function resolveComponentName(name) {
+function resolveComponent(name) {
   return (
     components[name] ||
     components[(0,_utils__WEBPACK_IMPORTED_MODULE_0__.camelize)(name)] ||
@@ -1169,14 +1344,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_2__.nextTick),
 /* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render),
 /* harmony export */   "renderList": () => (/* reexport safe */ _helper__WEBPACK_IMPORTED_MODULE_4__.renderList),
-/* harmony export */   "resolveComponentName": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_0__.resolveComponentName)
+/* harmony export */   "resolveComponent": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_0__.resolveComponent)
 /* harmony export */ });
 /* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
 /* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
 /* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
 /* harmony import */ var _helper__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./helper */ "./src/runtime/helper/index.js");
-
 
 
 
@@ -1194,17 +1368,13 @@ __webpack_require__.r(__webpack_exports__);
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "mount": () => (/* binding */ mount),
+/* harmony export */   "patch": () => (/* binding */ patch),
 /* harmony export */   "render": () => (/* binding */ render),
 /* harmony export */   "unmount": () => (/* binding */ unmount)
 /* harmony export */ });
-/* harmony import */ var _reactivity__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reactivity */ "./src/reactivity/index.js");
-/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _vnode__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./vnode */ "./src/runtime/vnode.js");
+/* harmony import */ var _component__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./component */ "./src/runtime/component.js");
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
-/* harmony import */ var _scheduler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./scheduler */ "./src/runtime/scheduler.js");
-/* harmony import */ var _compiler__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../compiler */ "./src/compiler/index.js");
-
-
-
 
 
 
@@ -1230,31 +1400,32 @@ function render(vnode, container) {
 
 function mount(vnode, container, anchor) {
   const { shapeFlag } = vnode;
-  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ELEMENT) {
+  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ELEMENT) {
     mountElement(vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT) {
     mountText(vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.FRAGMENT) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.FRAGMENT) {
     mountFragment(vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.COMPONENT) {
-    patchComponent(null, vnode, container, anchor);
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.COMPONENT) {
+    (0,_component__WEBPACK_IMPORTED_MODULE_1__.mountComponent)(vnode, container, anchor);
   }
 }
 
 function unmount(vnode) {
   const { shapeFlag } = vnode;
-  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ELEMENT || shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT) {
+  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ELEMENT || shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT) {
     /* 所有真实DOM的移除：Element和Text节点通过移除children实现 */
     const { el } = vnode;
     el.parentNode.removeChild(el);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.FRAGMENT) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.FRAGMENT) {
     unmountFragment(vnode);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.COMPONENT) {
-    unmountComponent(vnode);
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.COMPONENT) {
+    (0,_component__WEBPACK_IMPORTED_MODULE_1__.unmountComponent)(vnode);
   }
 }
 
 function patch(_vnode, vnode, container, anchor) {
+  // debugger
   if (!_vnode) {
     // 挂载
     mount(vnode, container, anchor);
@@ -1271,17 +1442,17 @@ function patch(_vnode, vnode, container, anchor) {
     _vnode = null; // 不放在unmount中，vnode可能还会复用，但类型不同肯定不复用
     return;
   }
-
+  //  debugger
   /* 同类型vnode，shapeFlag相同 */
   const { shapeFlag } = vnode;
-  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ELEMENT) {
+  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ELEMENT) {
     patchElement(_vnode, vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT) {
     patchText(_vnode, vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.FRAGMENT) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.FRAGMENT) {
     patchFragment(_vnode, vnode, container, anchor);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.COMPONENT) {
-    patchComponent(_vnode, vnode, container, anchor);
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.COMPONENT) {
+    (0,_component__WEBPACK_IMPORTED_MODULE_1__.patchComponent)(_vnode, vnode, container, anchor);
   }
 }
 
@@ -1294,9 +1465,9 @@ function mountElement(vnode, container, anchor) {
   const el = document.createElement(type);
   patchProps(null, props, el); /* 用patch改造mount */
 
-  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
+  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT_CHILDREN) {
     mountText(vnode, el);
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ARRAY_CHILDREN) {
     mountChildren(vnode.children, el);
   }
 
@@ -1350,7 +1521,6 @@ function unmountFragment(vnode) {
   }
   parent.removeChild(anchor);
 }
-function unmountComponent(vnode) {}
 
 function unmountChildren(children) {
   children.forEach((child) => unmount(child));
@@ -1375,121 +1545,16 @@ function patchFragment(_vnode, vnode, container) {
   patchChildren(_vnode, vnode, container, endAnchor);
 }
 
-function patchComponent(_vnode, vnode, container, anchor) {
-  // 组件由两个阶段生成
-  // 第一阶段是原生的不经过h函数包裹的组件对象 如 {setup(){}, render() {return h('div', null, "我是小明")}}
-  // 第二阶段是经过h函数包裹的vnode对象，如 h(Comp, vnodeProps);
-
-  // vnode的props属性有两种：1. 内部使用的props父传子，2.组件attrs标签属性
-  // 组件对象：Component，虚拟DOM：vnode
-
-  const { type: Component, props: vnodeProps } = vnode; /* 获取组件对象 */
-
-  const instance = {
-    props: null,
-    attrs: null,
-
-    setupState: null,
-    ctx: null,
-
-    subTree: null,
-    patch: null,
-  };
-  // 区分不同的属性
-  instance.props ||= {};
-  instance.attrs ||= {};
-  for (const key in vnodeProps) {
-    if (Component.props?.includes(key)) {
-      instance.props[key] = vnodeProps[key];
-    } else {
-      instance.attrs[key] = vnodeProps[key];
-    }
-  }
-  instance.props = (0,_reactivity__WEBPACK_IMPORTED_MODULE_0__.reactive)(instance.props); /* 做响应式处理 */
-
-  // 对于vue3，执行setup函数，获取返回值setupState，通过effect确定响应数据，最终通过render产出vnode，render接收ctx
-  instance.setupState = Component.setup?.(instance.props, {
-    attrs: instance.attrs,
-  });
-  instance.ctx = {
-    ...instance.props,
-    ...instance.setupState,
-  };
-
-  // 判断render函数是否存在，如果不存在，通过generate执行后生成的代码片段，通过new Function生成render函数
-  if (!Component.render) {
-    let { template } = Component;
-
-    if (template[0] === "#") {
-      /* 如果是一个#开头的mount 如#template */
-      const el = document.querySelector(template);
-      template = el ? el.innerHTML : "";
-      // 删除原template节点
-      el.parentNode.removeChild(el);
-    }
-
-    const code = (0,_compiler__WEBPACK_IMPORTED_MODULE_4__.compile)(template);
-    // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
-    Component.render = new Function(
-      "ctx",
-      `with(ctx) {
-        const {
-          createApp,
-          parse,
-          render,
-          h,
-          Text,
-          Fragment,
-          nextTick,
-          reactive,
-          ref,
-          computed,
-          effect,
-          compile,
-          renderList,
-          resolveComponentName
-        } = MiniVue;
-        return ${code}
-      }`
-    );
-  }
-
-  // console.log("组件的render：", Component.render);
-
-  // 执行render函数
-  instance.patch = () => {
-    const preTree = instance.subTree;
-    /* 生成vnode，作为旧subTree保存在自身的subTree属性 */
-    const subTree = (instance.subTree = (0,_vnode__WEBPACK_IMPORTED_MODULE_1__.normalizeVNode)(
-      Component.render(instance.ctx)
-    ));
-
-    vnode.el = subTree.el = preTree ? preTree.el : null;
-    // 根据vue文档，当返回单根节点时，将instance.attrs添加到根节点的attributes中，称为继承
-    subTree.props = {
-      ...(subTree.props || {}),
-      ...(instance.attrs || {}),
-    };
-    // debugger;
-    /* 并不会造成递归，因为render函数生成vnode不再是Comp对象，生成的是div等vnode */
-    patch(preTree, subTree, container, anchor);
-  };
-  /* 通过effect默认执行代表mount，当变量发生改变时也会重新执行 */
-  (0,_reactivity__WEBPACK_IMPORTED_MODULE_0__.effect)(instance.patch, {
-    scheduler: _scheduler__WEBPACK_IMPORTED_MODULE_3__.scheduler, //trigger优先执行scheduler，并将传入的fn传入scheduler函数,
-  });
-}
-
 function patchChildren(_vnode, vnode, container, anchor) {
   /* 更新children函数 */
   const { shapeFlag: _shapeFlag, children: _children } = _vnode;
   const { shapeFlag, children } = vnode;
 
-  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
+  if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT_CHILDREN) {
     // 如果新vnode是TEXT_CHILDREN类型
-    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
+    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT_CHILDREN) {
       // container.textContent = children;
-    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
+    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ARRAY_CHILDREN) {
       unmountChildren(_children); /* 卸载旧组件！ */
       // container.textContent = children;
     } else if (_vnode === null) {
@@ -1498,21 +1563,21 @@ function patchChildren(_vnode, vnode, container, anchor) {
     if (_children !== children) {
       container.textContent = children;
     }
-  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
+  } else if (shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ARRAY_CHILDREN) {
     // 如果新vnode是ARRAY_CHILDREN类型
-    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
+    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT_CHILDREN) {
       container.textContent = "";
       mountChildren(children, container, anchor);
-    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
+    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ARRAY_CHILDREN) {
       patchArrayChildren(_children, children, container, anchor);
     } else if (_vnode === null) {
       mountChildren(children, container, anchor);
     }
   } else if (vnode === null) {
     // 如果新vnode是null类型
-    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.TEXT_CHILDREN) {
+    if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.TEXT_CHILDREN) {
       container.textContent = "";
-    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_1__.ShapeFlags.ARRAY_CHILDREN) {
+    } else if (_shapeFlag & _vnode__WEBPACK_IMPORTED_MODULE_0__.ShapeFlags.ARRAY_CHILDREN) {
       unmountChildren(_children);
     } else if (_vnode === null) {
       // 都不存在即不执行任何操作！
@@ -1670,7 +1735,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "h": () => (/* binding */ h),
 /* harmony export */   "normalizeVNode": () => (/* binding */ normalizeVNode)
 /* harmony export */ });
-/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _reactivity_reactive__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reactivity/reactive */ "./src/reactivity/reactive.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+
 
 
 const ShapeFlags = {
@@ -1706,9 +1773,9 @@ function h(type, props, children) {
       shapeFlag |= type === Text ? ShapeFlags.TEXT : ShapeFlags.FRAGMENT;
       break;
   }
-  switch (typeof children /* 判断自身 */) {
+  switch (typeof children /* 判断 */) {
     case "object":
-      shapeFlag |= (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(children)
+      shapeFlag |= (0,_utils__WEBPACK_IMPORTED_MODULE_1__.isArray)(children)
         ? ShapeFlags.ARRAY_CHILDREN
         : 0; /* 如果是数组，那么添加进shapeFlag中，否则不变 */
       break;
@@ -1720,12 +1787,17 @@ function h(type, props, children) {
       break;
   }
 
-  // return {
-  //   type,
-  //   props,
-  //   children,
-  //   shapeFlag,
-  // };
+  if (props) {
+    // 更新了props，需要重新浅拷贝触发render
+    if ((0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_0__.isReactive)(props)) { 
+      props = Object.assign({}, props);
+    }
+    // reactive state objects need to be cloned since they are likely to be
+    if ((0,_reactivity_reactive__WEBPACK_IMPORTED_MODULE_0__.isReactive)(props.style)) {
+      props.style = Object.assign({}, props.style);
+    }
+  }
+
   return {
     type,
     props,
@@ -1737,13 +1809,13 @@ function h(type, props, children) {
 }
 
 function normalizeVNode(vnode) {
-  if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isArray)(vnode)) {
+  if ((0,_utils__WEBPACK_IMPORTED_MODULE_1__.isArray)(vnode)) {
     return h(Fragment, null, vnode);
   }
-  if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isObject)(vnode)) {
+  if ((0,_utils__WEBPACK_IMPORTED_MODULE_1__.isObject)(vnode)) {
     return vnode;
   }
-  if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(vnode) || (0,_utils__WEBPACK_IMPORTED_MODULE_0__.isNumber)(vnode)) {
+  if ((0,_utils__WEBPACK_IMPORTED_MODULE_1__.isString)(vnode) || (0,_utils__WEBPACK_IMPORTED_MODULE_1__.isNumber)(vnode)) {
     return h(Text, null, vnode.toString());
   }
 }
@@ -1917,7 +1989,7 @@ const MiniVue = (window.MiniVue = {
   effect: _reactivity__WEBPACK_IMPORTED_MODULE_2__.effect,
   compile: _compiler__WEBPACK_IMPORTED_MODULE_0__.compile,
   renderList: _runtime__WEBPACK_IMPORTED_MODULE_1__.renderList,
-  resolveComponentName: _runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponentName,
+  resolveComponent: _runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponent,
 });
 
 // console.log(
@@ -1933,3 +2005,4 @@ const MiniVue = (window.MiniVue = {
 
 /******/ })()
 ;
+//# sourceMappingURL=mini-vue.js.map

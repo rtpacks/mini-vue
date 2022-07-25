@@ -90,13 +90,16 @@ const { age } = obj;
 console.log(age);
 console.log(obj);
 
-const arr = [1, 2, 3, 4, 5, 6, 7];
+let arr = [1, 2, 3, 4, 5, 6, 7];
 let sarr = arr.map((v, i) => {
   console.log(v, i);
   if (i == 3) {
     arr.push(5);
   }
-  return v
+  return v;
 });
 
-console.log(sarr)
+console.log(sarr);
+
+arr = [1];
+console.log(arr.values())

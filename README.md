@@ -2,6 +2,8 @@
 
 diff是一个最长递增子序列的算法，vue的diff算法建立在react的diff之上，多增加了一些判断。即使没有diff，也是可以运行的，只是性能很差。
 
+compiler、reactivity、runtime的基本功能都可以实现，但是目前还是有许多bug，如reactive对于多层对象 | 数组的依赖收集不完善，必须要将Proxy代理的对象的属性的地址更新才能够正常的响应，而vue3可以通过push一个元素数组就可以达到响应。
+
 未完成部分
 
 - 虚拟dom比较即diff
