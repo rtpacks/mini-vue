@@ -1,4 +1,4 @@
-import { NodeTypes } from ".";
+import { NodeTypes, ElementTypes } from ".";
 import { resolveComponentName } from "../runtime";
 import { capitalize } from "../utils";
 
