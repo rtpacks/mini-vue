@@ -94,7 +94,7 @@ const arr = [1, 2, 3, 4, 5, 6, 7];
 let sarr = arr.map((v, i) => {
   console.log(v, i);
   if (i == 3) {
-    delete arr[5];
+    arr.push(5);
   }
   return v
 });

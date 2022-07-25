@@ -9,11 +9,13 @@
   <script src="../../dist/mini-vue.js"></script>
 
   <body>
+    <!-- <div v-if="ok.value">v-if</div>
+    <div v-else-if="ok.value">v-else-if</div>
+    <div v-else>v-else</div>
+    <button @click="toggle">toggle</button> -->
     <div id="app">
-      <div v-if="ok.value">v-if</div>
-      <div v-else-if="ok.value">v-else-if</div>
-      <div v-else>v-else</div>
-      <button @click="toggle">toggle</button>
+      <input type="text" v-model="input.value" />
+      <div>{{input.value}}</div>
     </div>
     <script>
       const { createApp, ref, reactive } = MiniVue;
@@ -36,6 +38,8 @@
           // setInterval(() => {
           //   ok.value = !ok.value;
           // }, 1000);
+
+          const input = ref("请输入~");
           return {
             counter,
             add,
@@ -44,6 +48,7 @@
             newFrined,
             ok,
             toggle,
+            input,
           };
         },
       }).mount("#app");

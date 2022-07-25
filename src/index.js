@@ -1,6 +1,7 @@
 import { compile, parse } from "./compiler";
 import {
   createApp,
+  resolveComponentName,
   render,
   h,
   Text,
@@ -24,6 +25,7 @@ export const MiniVue = (window.MiniVue = {
   effect,
   compile,
   renderList,
+  resolveComponentName,
 });
 
 // console.log(

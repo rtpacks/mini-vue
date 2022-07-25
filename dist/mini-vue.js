@@ -51,7 +51,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "generate": () => (/* binding */ generate)
 /* harmony export */ });
 /* harmony import */ var ___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! . */ "./src/compiler/index.js");
-/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+/* harmony import */ var _runtime__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../runtime */ "./src/runtime/index.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
+
 
 
 
@@ -75,7 +77,7 @@ function traverseNode(node, parent) {
     case ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.ELEMENT:
       // 指令节点都在元素节点中，处理元素节点的同时也处理指令节点
       // 对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
-      // v-for使用renderList
+      // v-for使用renderList，
 
       // traverseChildren是parent参数的真正入口
       return resolveElementVNode(node, parent);
@@ -105,9 +107,7 @@ function createInterpolationVNode(node) {
 
 function resolveElementVNode(node, parent) {
   const { directives } = node;
-
-  // debugger;
-  // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
+  // 特殊的指令如v-for，v-if处理，而普通的bind，on，v-model(on、bind的语法糖)等在createElementVNode中处理
   const forNode = pluck(directives, "for");
   if (forNode) {
     // <div v-for="(item, index) in items">{{item + index}}</div>
@@ -173,7 +173,7 @@ function resolveElementVNode(node, parent) {
           parent.children.splice(ifIdx, idx - ifIdx); // 需要先删除，否则会重复
           elseExp = `${resolveElementVNode(child, parent)}`;
         }
-        break;
+        break; // 只检查下一个ELEMENT类型的节点
       }
     }
     return `${condition} ? ${ifExp} : ${elseExp}`;
@@ -183,11 +183,16 @@ function resolveElementVNode(node, parent) {
 }
 
 function createElementVNode(node) {
-  const tag = createText({ content: node.tag }); //创建文本
-
-  const props = formatProps(node);
+  // const tag = createText({ content: node.tag }); //创建文本
+  // 真实的场景中，还会有自定义组件，即通过components:{} 传入的组件名称，需要在createApp函数中获取组件的名称
+  let { tag, tagType } = node;
+  tag =
+    tagType === ElementTypes.ELEMENT
+      ? createText({ content: tag }) // 普通类型
+      : `${(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponentName)(tag)}`; // 组件对象类型
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
+  const props = formatProps(node);
   const children = traverseChildren(node);
   if (props === "null" && children === "[]") {
     return `h(${tag})`;
@@ -201,6 +206,37 @@ function createElementVNode(node) {
 
 function createPropArr(node) {
   const { props, directives } = node;
+  // v-model是一个on+bind的语法糖，使用map不会自动更新length，提前设置
+  const vModel = pluck(node.directives, "model");
+  if (vModel) {
+    directives.push(
+      {
+        type: ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.DIRECTIVE,
+        name: "bind",
+        exp: vModel.exp, // 表达式节点
+        arg: {
+          type: ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.SIMPLE_EXPRESSION,
+          content: "value",
+          isStatic: true,
+        }, // 表达式节点
+      },
+      {
+        type: ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.DIRECTIVE,
+        name: "on",
+        exp: {
+          type: ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.SIMPLE_EXPRESSION,
+          content: `($event) => ${vModel.exp.content} = $event.target.value`,
+          isStatic: false,
+        }, // 表达式节点
+        arg: {
+          type: ___WEBPACK_IMPORTED_MODULE_0__.NodeTypes.SIMPLE_EXPRESSION,
+          content: "input",
+          isStatic: true,
+        }, // 表达式节点
+      }
+    );
+  }
+
   return [
     ...props.map((prop) => `${prop.name}: ${createText(prop.value)}`),
     ...directives.map((dir) => {
@@ -209,7 +245,7 @@ function createPropArr(node) {
         case "bind":
           return `${dir.arg.content}: ${createText(dir.exp)}`;
         case "on":
-          const event = `on${(0,_utils__WEBPACK_IMPORTED_MODULE_1__.capitalize)(
+          const event = `on${(0,_utils__WEBPACK_IMPORTED_MODULE_2__.capitalize)(
             dir.arg.content
           )}`; /* 事件名称格式化，如onClick */
 
@@ -1003,7 +1039,8 @@ function convert(value) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "createApp": () => (/* binding */ createApp)
+/* harmony export */   "createApp": () => (/* binding */ createApp),
+/* harmony export */   "resolveComponentName": () => (/* binding */ resolveComponentName)
 /* harmony export */ });
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils */ "./src/utils/index.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
@@ -1012,7 +1049,9 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+let components = {};
 function createApp(root) {
+  components = root.components || {};
   const app = {
     mount(container) {
       if ((0,_utils__WEBPACK_IMPORTED_MODULE_0__.isString)(container)) {
@@ -1034,6 +1073,14 @@ function createApp(root) {
     },
   };
   return app;
+}
+
+function resolveComponentName(name) {
+  return (
+    components[name] ||
+    components[(0,_utils__WEBPACK_IMPORTED_MODULE_0__.camelize)(name)] ||
+    components[(0,_utils__WEBPACK_IMPORTED_MODULE_0__.capitalize)((0,_utils__WEBPACK_IMPORTED_MODULE_0__.camelize)(name))]
+  );
 }
 
 
@@ -1121,7 +1168,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "mount": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.mount),
 /* harmony export */   "nextTick": () => (/* reexport safe */ _scheduler__WEBPACK_IMPORTED_MODULE_2__.nextTick),
 /* harmony export */   "render": () => (/* reexport safe */ _renderer__WEBPACK_IMPORTED_MODULE_1__.render),
-/* harmony export */   "renderList": () => (/* reexport safe */ _helper__WEBPACK_IMPORTED_MODULE_4__.renderList)
+/* harmony export */   "renderList": () => (/* reexport safe */ _helper__WEBPACK_IMPORTED_MODULE_4__.renderList),
+/* harmony export */   "resolveComponentName": () => (/* reexport safe */ _createApp__WEBPACK_IMPORTED_MODULE_0__.resolveComponentName)
 /* harmony export */ });
 /* harmony import */ var _createApp__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./createApp */ "./src/runtime/createApp.js");
 /* harmony import */ var _renderer__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./renderer */ "./src/runtime/renderer.js");
@@ -1399,6 +1447,7 @@ function patchComponent(_vnode, vnode, container, anchor) {
           effect,
           compile,
           renderList,
+          resolveComponentName
         } = MiniVue;
         return ${code}
       }`
@@ -1868,6 +1917,7 @@ const MiniVue = (window.MiniVue = {
   effect: _reactivity__WEBPACK_IMPORTED_MODULE_2__.effect,
   compile: _compiler__WEBPACK_IMPORTED_MODULE_0__.compile,
   renderList: _runtime__WEBPACK_IMPORTED_MODULE_1__.renderList,
+  resolveComponentName: _runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponentName,
 });
 
 // console.log(
@@ -1878,6 +1928,7 @@ const MiniVue = (window.MiniVue = {
 //      {{Hello}}</div>
 // </div>`)
 // );
+
 })();
 
 /******/ })()
