@@ -158,9 +158,9 @@ function patchElement(_vnode, vnode, container) {
 }
 
 function patchText(_vnode, vnode, container, anchor) {
-  container.textContent = vnode.children; /* 更新真实dom的内容 */
   vnode.el = _vnode.el;
   vnode.anchor = _vnode.anchor;
+  vnode.el.textContent = vnode.children; /* 更新真实dom的内容 */
 }
 
 function patchFragment(_vnode, vnode, container) {
