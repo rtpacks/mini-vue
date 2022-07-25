@@ -1,8 +1,10 @@
-import { isString } from "../utils";
+import { camelize, capitalize, isString } from "../utils";
 import { render } from "./renderer";
 import { h } from "./vnode";
 
+let components = {};
 export function createApp(root) {
+  components = root.components || {};
   const app = {
     mount(container) {
       if (isString(container)) {
@@ -24,4 +26,12 @@ export function createApp(root) {
     },
   };
   return app;
+}
+
+export function resolveComponentName(name) {
+  return (
+    components[name] ||
+    components[camelize(name)] ||
+    components[capitalize(camelize(name))]
+  );
 }

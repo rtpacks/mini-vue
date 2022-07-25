@@ -243,6 +243,7 @@ function patchComponent(_vnode, vnode, container, anchor) {
           effect,
           compile,
           renderList,
+          resolveComponentName
         } = MiniVue;
         return ${code}
       }`

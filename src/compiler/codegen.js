@@ -1,4 +1,5 @@
 import { NodeTypes } from ".";
+import { resolveComponentName } from "../runtime";
 import { capitalize } from "../utils";
 
 // 接受一段语法树，返回对应的以h函数代码片段形式表达的虚拟dom树
@@ -21,7 +22,7 @@ function traverseNode(node, parent) {
     case NodeTypes.ELEMENT:
       // 指令节点都在元素节点中，处理元素节点的同时也处理指令节点
       // 对于v-for v-if 等能够改变dom结构的结构型指令来说，需要配合runtime进行实现
-      // v-for使用renderList
+      // v-for使用renderList，
 
       // traverseChildren是parent参数的真正入口
       return resolveElementVNode(node, parent);
@@ -127,11 +128,16 @@ function resolveElementVNode(node, parent) {
 }
 
 function createElementVNode(node) {
-  const tag = createText({ content: node.tag }); //创建文本
-
-  const props = formatProps(node);
+  // const tag = createText({ content: node.tag }); //创建文本
+  // 真实的场景中，还会有自定义组件，即通过components:{} 传入的组件名称，需要在createApp函数中获取组件的名称
+  let { tag, tagType } = node;
+  tag =
+    tagType === ElementTypes.ELEMENT
+      ? createText({ content: tag }) // 普通类型
+      : `${resolveComponentName(tag)}`; // 组件对象类型
 
   /* 不需要单独的判断子元素的个数，通过遍历即可，但是为了存储的优化，需要进行判断 */
+  const props = formatProps(node);
   const children = traverseChildren(node);
   if (props === "null" && children === "[]") {
     return `h(${tag})`;
