@@ -1,4 +1,4 @@
-export { createApp, resolveComponentName } from "./createApp";
+export { createApp, resolveComponent } from "./createApp";
 export { render, mount } from "./renderer";
 export { nextTick } from "./scheduler";
 export { h, ShapeFlags, Text, Fragment } from "./vnode";

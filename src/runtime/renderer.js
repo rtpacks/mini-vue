@@ -1,9 +1,6 @@
-import { reactive } from "../reactivity";
-import { h, normalizeVNode, ShapeFlags } from "./vnode";
+import { ShapeFlags } from "./vnode";
+import { mountComponent, patchComponent, unmountComponent } from "./component";
 import { isFunction } from "../utils";
-import { effect } from "../reactivity";
-import { scheduler } from "./scheduler";
-import { compile } from "../compiler";
 
 /**
  * 渲染VNode，每种vnode对应不同的mount/unmount/patch函数
@@ -33,7 +30,7 @@ export function mount(vnode, container, anchor) {
   } else if (shapeFlag & ShapeFlags.FRAGMENT) {
     mountFragment(vnode, container, anchor);
   } else if (shapeFlag & ShapeFlags.COMPONENT) {
-    patchComponent(null, vnode, container, anchor);
+    mountComponent(vnode, container, anchor);
   }
 }
 
@@ -50,7 +47,8 @@ export function unmount(vnode) {
   }
 }
 
-function patch(_vnode, vnode, container, anchor) {
+export function patch(_vnode, vnode, container, anchor) {
+  // debugger
   if (!_vnode) {
     // 挂载
     mount(vnode, container, anchor);
@@ -67,7 +65,7 @@ function patch(_vnode, vnode, container, anchor) {
     _vnode = null; // 不放在unmount中，vnode可能还会复用，但类型不同肯定不复用
     return;
   }
-
+  //  debugger
   /* 同类型vnode，shapeFlag相同 */
   const { shapeFlag } = vnode;
   if (shapeFlag & ShapeFlags.ELEMENT) {
@@ -146,7 +144,6 @@ function unmountFragment(vnode) {
   }
   parent.removeChild(anchor);
 }
-function unmountComponent(vnode) {}
 
 function unmountChildren(children) {
   children.forEach((child) => unmount(child));
@@ -169,111 +166,6 @@ function patchFragment(_vnode, vnode, container) {
   const startAnchor = (vnode.el = _vnode.el);
   const endAnchor = (vnode.anchor = _vnode.anchor);
   patchChildren(_vnode, vnode, container, endAnchor);
-}
-
-function patchComponent(_vnode, vnode, container, anchor) {
-  // 组件由两个阶段生成
-  // 第一阶段是原生的不经过h函数包裹的组件对象 如 {setup(){}, render() {return h('div', null, "我是小明")}}
-  // 第二阶段是经过h函数包裹的vnode对象，如 h(Comp, vnodeProps);
-
-  // vnode的props属性有两种：1. 内部使用的props父传子，2.组件attrs标签属性
-  // 组件对象：Component，虚拟DOM：vnode
-
-  const { type: Component, props: vnodeProps } = vnode; /* 获取组件对象 */
-
-  const instance = {
-    props: null,
-    attrs: null,
-
-    setupState: null,
-    ctx: null,
-
-    subTree: null,
-    patch: null,
-  };
-  // 区分不同的属性
-  instance.props ||= {};
-  instance.attrs ||= {};
-  for (const key in vnodeProps) {
-    if (Component.props?.includes(key)) {
-      instance.props[key] = vnodeProps[key];
-    } else {
-      instance.attrs[key] = vnodeProps[key];
-    }
-  }
-  instance.props = reactive(instance.props); /* 做响应式处理 */
-
-  // 对于vue3，执行setup函数，获取返回值setupState，通过effect确定响应数据，最终通过render产出vnode，render接收ctx
-  instance.setupState = Component.setup?.(instance.props, {
-    attrs: instance.attrs,
-  });
-  instance.ctx = {
-    ...instance.props,
-    ...instance.setupState,
-  };
-
-  // 判断render函数是否存在，如果不存在，通过generate执行后生成的代码片段，通过new Function生成render函数
-  if (!Component.render) {
-    let { template } = Component;
-
-    if (template[0] === "#") {
-      /* 如果是一个#开头的mount 如#template */
-      const el = document.querySelector(template);
-      template = el ? el.innerHTML : "";
-      // 删除原template节点
-      el.parentNode.removeChild(el);
-    }
-
-    const code = compile(template);
-    // 通过new Function生成可执行代码，同时为了便于解决参数问题，使用with改变作用域链
-    Component.render = new Function(
-      "ctx",
-      `with(ctx) {
-        const {
-          createApp,
-          parse,
-          render,
-          h,
-          Text,
-          Fragment,
-          nextTick,
-          reactive,
-          ref,
-          computed,
-          effect,
-          compile,
-          renderList,
-          resolveComponentName
-        } = MiniVue;
-        return ${code}
-      }`
-    );
-  }
-
-  // console.log("组件的render：", Component.render);
-
-  // 执行render函数
-  instance.patch = () => {
-    const preTree = instance.subTree;
-    /* 生成vnode，作为旧subTree保存在自身的subTree属性 */
-    const subTree = (instance.subTree = normalizeVNode(
-      Component.render(instance.ctx)
-    ));
-
-    vnode.el = subTree.el = preTree ? preTree.el : null;
-    // 根据vue文档，当返回单根节点时，将instance.attrs添加到根节点的attributes中，称为继承
-    subTree.props = {
-      ...(subTree.props || {}),
-      ...(instance.attrs || {}),
-    };
-    // debugger;
-    /* 并不会造成递归，因为render函数生成vnode不再是Comp对象，生成的是div等vnode */
-    patch(preTree, subTree, container, anchor);
-  };
-  /* 通过effect默认执行代表mount，当变量发生改变时也会重新执行 */
-  effect(instance.patch, {
-    scheduler: scheduler, //trigger优先执行scheduler，并将传入的fn传入scheduler函数,
-  });
 }
 
 function patchChildren(_vnode, vnode, container, anchor) {

@@ -28,7 +28,7 @@ export function createApp(root) {
   return app;
 }
 
-export function resolveComponentName(name) {
+export function resolveComponent(name) {
   return (
     components[name] ||
     components[camelize(name)] ||

@@ -1,3 +1,4 @@
+import { isReactive } from "../reactivity/reactive";
 import { isArray, isNumber, isObject, isString } from "../utils";
 
 export const ShapeFlags = {
@@ -33,7 +34,7 @@ export function h(type, props, children) {
       shapeFlag |= type === Text ? ShapeFlags.TEXT : ShapeFlags.FRAGMENT;
       break;
   }
-  switch (typeof children /* 判断自身 */) {
+  switch (typeof children /* 判断 */) {
     case "object":
       shapeFlag |= isArray(children)
         ? ShapeFlags.ARRAY_CHILDREN
@@ -47,12 +48,17 @@ export function h(type, props, children) {
       break;
   }
 
-  // return {
-  //   type,
-  //   props,
-  //   children,
-  //   shapeFlag,
-  // };
+  if (props) {
+    // 更新了props，需要重新浅拷贝触发render
+    if (isReactive(props)) { 
+      props = Object.assign({}, props);
+    }
+    // reactive state objects need to be cloned since they are likely to be
+    if (isReactive(props.style)) {
+      props.style = Object.assign({}, props.style);
+    }
+  }
+
   return {
     type,
     props,
