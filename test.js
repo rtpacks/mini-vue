@@ -84,8 +84,19 @@ obj = {
   name: "lisi",
   age: 18,
   height: 1.9,
-  if: "hello"
+  if: "hello",
 };
 const { age } = obj;
 console.log(age);
 console.log(obj);
+
+const arr = [1, 2, 3, 4, 5, 6, 7];
+let sarr = arr.map((v, i) => {
+  console.log(v, i);
+  if (i == 3) {
+    delete arr[5];
+  }
+  return v
+});
+
+console.log(sarr)

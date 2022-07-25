@@ -85,3 +85,7 @@ function flushJobs() {
     return;
   }
 ```
+
+- v-if 、v-else 相邻
+
+vue的v-if/v-else必须要相邻，否则else指令不生效。当然可以改造成不相邻的形式，但是实现会比较复杂，思路是：在遍历children中，如果找到if指令，那么拿到parent节点，parent.children继续往下找，直到找到else指令或者children结束，并且每遍历一个child就需要children原地删除一个，否则会形成重复遍历。

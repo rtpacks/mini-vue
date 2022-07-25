@@ -10,17 +10,9 @@
 
   <body>
     <div id="app">
-      <div v-for="(frined, index) in friends" :key="frined.name">
-        {{index+1 +' · '+ frined.name}}
-      </div>
-      <hr />
-      <div
-        v-if="ok.value"
-        v-for="(frined, index) in friends"
-        :key="frined.name"
-      >
-        {{index+1 +' · '+ frined.name}}
-      </div>
+      <div v-if="ok.value">v-if</div>
+      <div v-else-if="ok.value">v-else-if</div>
+      <div v-else>v-else</div>
       <button @click="toggle">toggle</button>
     </div>
     <script>
@@ -41,9 +33,9 @@
             ok.value = !ok.value;
             console.log("toggle", ok.value);
           };
-          setInterval(() => {
-            ok.value = !ok.value;
-          }, 1000);
+          // setInterval(() => {
+          //   ok.value = !ok.value;
+          // }, 1000);
           return {
             counter,
             add,
