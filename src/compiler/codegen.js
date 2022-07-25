@@ -51,9 +51,7 @@ function createInterpolationVNode(node) {
 
 function resolveElementVNode(node, parent) {
   const { directives } = node;
-
-  // debugger;
-  // 特殊的指令如v-for，v-if，v-model处理，而普通的bind，on等在createElementVNode中处理
+  // 特殊的指令如v-for，v-if处理，而普通的bind，on，v-model(on、bind的语法糖)等在createElementVNode中处理
   const forNode = pluck(directives, "for");
   if (forNode) {
     // <div v-for="(item, index) in items">{{item + index}}</div>
@@ -119,7 +117,7 @@ function resolveElementVNode(node, parent) {
           parent.children.splice(ifIdx, idx - ifIdx); // 需要先删除，否则会重复
           elseExp = `${resolveElementVNode(child, parent)}`;
         }
-        break;
+        break; // 只检查下一个ELEMENT类型的节点
       }
     }
     return `${condition} ? ${ifExp} : ${elseExp}`;
@@ -147,6 +145,37 @@ function createElementVNode(node) {
 
 function createPropArr(node) {
   const { props, directives } = node;
+  // v-model是一个on+bind的语法糖，使用map不会自动更新length，提前设置
+  const vModel = pluck(node.directives, "model");
+  if (vModel) {
+    directives.push(
+      {
+        type: NodeTypes.DIRECTIVE,
+        name: "bind",
+        exp: vModel.exp, // 表达式节点
+        arg: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: "value",
+          isStatic: true,
+        }, // 表达式节点
+      },
+      {
+        type: NodeTypes.DIRECTIVE,
+        name: "on",
+        exp: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: `($event) => ${vModel.exp.content} = $event.target.value`,
+          isStatic: false,
+        }, // 表达式节点
+        arg: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: "input",
+          isStatic: true,
+        }, // 表达式节点
+      }
+    );
+  }
+
   return [
     ...props.map((prop) => `${prop.name}: ${createText(prop.value)}`),
     ...directives.map((dir) => {
