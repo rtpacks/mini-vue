@@ -25,8 +25,8 @@
   const { reactive, computed, ref } = MiniVue;
 
   const TreeItem = {
-    template: '#item-template',
-    props: ['model'],
+    template: "#item-template",
+    props: ["model"],
     setup(props) {
       const open = ref(false);
       const isFolder = computed(() => {
@@ -46,9 +46,12 @@
       }
 
       function addChild() {
-        props.model.children.push({
-          name: 'new stuff',
-        });
+        props.model.children = [
+          ...props.model.children,
+          {
+            name: "new stuff",
+          },
+        ];
       }
 
       return {
@@ -71,42 +74,42 @@
 
 <script>
   const treeData = {
-    name: 'My Tree',
+    name: "My Tree",
     children: [
       {
-        name: 'hello',
+        name: "hello",
       },
       {
-        name: 'wat',
+        name: "wat",
       },
       {
-        name: 'child folder',
+        name: "child folder",
         children: [
           {
-            name: 'child folder',
+            name: "child folder",
             children: [
               {
-                name: 'hello',
+                name: "hello",
               },
               {
-                name: 'wat',
+                name: "wat",
               },
             ],
           },
           {
-            name: 'hello',
+            name: "hello",
           },
           {
-            name: 'wat',
+            name: "wat",
           },
           {
-            name: 'child folder',
+            name: "child folder",
             children: [
               {
-                name: 'hello',
+                name: "hello",
               },
               {
-                name: 'wat',
+                name: "wat",
               },
             ],
           },
@@ -124,7 +127,7 @@
         treeData,
       };
     },
-  }).mount('#demo');
+  }).mount("#demo");
 </script>
 
 <style>

@@ -13,44 +13,15 @@
     <div v-else-if="ok.value">v-else-if</div>
     <div v-else>v-else</div>
     <button @click="toggle">toggle</button> -->
+    <!-- <input type="text" v-model="input.value" />
+    <div>{{input.value}}</div> -->
     <div id="app">
-      <input type="text" v-model="input.value" />
-      <div>{{input.value}}</div>
+      <div>Hello</div>
     </div>
     <script>
       const { createApp, ref, reactive } = MiniVue;
 
       createApp({
-        setup() {
-          const counter = ref(0);
-          const add = () => (counter.value += 3);
-          const sub = () => counter.value--;
-
-          // debugger
-          const friends = reactive([{ name: "小黄" }, { name: "小黄" }]);
-          const newFrined = () => (friends = [...friends, { name: "A" }]);
-
-          const ok = ref(true);
-          const toggle = () => {
-            ok.value = !ok.value;
-            console.log("toggle", ok.value);
-          };
-          // setInterval(() => {
-          //   ok.value = !ok.value;
-          // }, 1000);
-
-          const input = ref("请输入~");
-          return {
-            counter,
-            add,
-            sub,
-            friends,
-            newFrined,
-            ok,
-            toggle,
-            input,
-          };
-        },
       }).mount("#app");
     </script>
   </body>
