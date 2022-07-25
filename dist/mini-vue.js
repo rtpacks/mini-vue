@@ -187,7 +187,7 @@ function createElementVNode(node) {
   // 真实的场景中，还会有自定义组件，即通过components:{} 传入的组件名称，需要在createApp函数中获取组件的名称
   let { tag, tagType } = node;
   tag =
-    tagType === ElementTypes.ELEMENT
+    tagType === ___WEBPACK_IMPORTED_MODULE_0__.ElementTypes.ELEMENT
       ? createText({ content: tag }) // 普通类型
       : `${(0,_runtime__WEBPACK_IMPORTED_MODULE_1__.resolveComponentName)(tag)}`; // 组件对象类型
 
